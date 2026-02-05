@@ -1,17 +1,13 @@
-//
-//  LightyApp.swift
-//  Lighty
-//
-//  Created by Donovan Efrain Barrientos Abarca on 05/02/26.
-//
-
 import SwiftUI
 
 @main
 struct LightyApp: App {
+    @StateObject private var store = RoutineStore()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(store)
         }
     }
 }

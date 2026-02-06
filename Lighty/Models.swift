@@ -18,6 +18,7 @@ struct ExerciseEntry: Identifiable, Hashable {
     let id: UUID
     var name: String
     var notes: String
+    var imageURL: URL?
     var sets: [WorkoutSet]
     /// 0 means rest timer is off. Values are in minutes, with 0.5 increments.
     var restMinutes: Double
@@ -26,12 +27,14 @@ struct ExerciseEntry: Identifiable, Hashable {
         id: UUID = UUID(),
         name: String,
         notes: String = "",
+        imageURL: URL? = nil,
         sets: [WorkoutSet] = [WorkoutSet(), WorkoutSet()],
         restMinutes: Double = 0
     ) {
         self.id = id
         self.name = name
         self.notes = notes
+        self.imageURL = imageURL
         self.sets = sets
         self.restMinutes = restMinutes
     }

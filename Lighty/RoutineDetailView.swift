@@ -62,7 +62,7 @@ struct RoutineDetailView: View {
         }
         .sheet(isPresented: $showExercisePicker) {
             AddExerciseCatalogView { selected in
-                addExercise(named: selected.name)
+                addExercise(from: selected)
                 showExercisePicker = false
             }
         }
@@ -74,8 +74,8 @@ struct RoutineDetailView: View {
         }
     }
 
-    private func addExercise(named name: String) {
-        routine.exercises.append(ExerciseEntry(name: name))
+    private func addExercise(from catalog: ExerciseCatalogItem) {
+        routine.exercises.append(ExerciseEntry(name: catalog.name, imageURL: catalog.imageURL))
     }
 
     private func saveRoutine() {
@@ -91,8 +91,11 @@ private struct ExerciseEditorView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(exercise.name)
-                .font(.headline)
+            HStack(spacing: 8) {
+                ExerciseRowThumbnail(imageURL: exercise.imageURL)
+                Text(exercise.name)
+                    .font(.headline)
+            }
 
             TextField("Write your notes here", text: $exercise.notes, axis: .vertical)
                 .lineLimit(3, reservesSpace: true)

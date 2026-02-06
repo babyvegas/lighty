@@ -1,4 +1,15 @@
 import SwiftUI
+internal import Combine
+
+private extension URL {
+    func appending(queryItems: [URLQueryItem]) -> URL {
+        guard var components = URLComponents(url: self, resolvingAgainstBaseURL: false) else {
+            return self
+        }
+        components.queryItems = (components.queryItems ?? []) + queryItems
+        return components.url ?? self
+    }
+}
 
 struct AddExerciseCatalogView: View {
     @EnvironmentObject private var store: RoutineStore
@@ -7,23 +18,9 @@ struct AddExerciseCatalogView: View {
     var onSelect: (ExerciseCatalogItem) -> Void
 
     @State private var searchText = ""
-
-    private let popularExercises: [ExerciseCatalogItem] = [
-        ExerciseCatalogItem(
-            id: "bench_press",
-            name: "Barbell Bench Press",
-            muscle: "Chest",
-            equipment: "Barbell",
-            imageURL: nil
-        ),
-        ExerciseCatalogItem(
-            id: "dumbbell_row",
-            name: "Dumbbell Row",
-            muscle: "Back",
-            equipment: "Dumbbell",
-            imageURL: nil
-        )
-    ]
+    @StateObject private var viewModel = ExerciseCatalogViewModel()
+    @State private var showMusclePicker = false
+    @State private var showEquipmentPicker = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -44,14 +41,18 @@ struct AddExerciseCatalogView: View {
             }
 
             HStack(spacing: 12) {
-                Button("Muscles") { }
+                Button("Muscles") {
+                    showMusclePicker = true
+                }
                     .buttonStyle(.plain)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .background(Color(white: 0.92))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
 
-                Button("Equipment") { }
+                Button("Equipment") {
+                    showEquipmentPicker = true
+                }
                     .buttonStyle(.plain)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
@@ -60,12 +61,12 @@ struct AddExerciseCatalogView: View {
             }
 
             let recent = store.recentExercises
-            Text(recent.isEmpty ? "Popular" : "Recent")
+            Text(viewModel.sectionTitle(recentIsEmpty: recent.isEmpty))
                 .font(.headline)
 
             ScrollView {
                 LazyVStack(spacing: 12) {
-                    ForEach(filteredExercises(from: recent.isEmpty ? popularExercises : recent)) { exercise in
+                    ForEach(displayedExercises(recent: recent)) { exercise in
                         Button {
                             store.addRecentExercise(exercise)
                             onSelect(exercise)
@@ -98,17 +99,42 @@ struct AddExerciseCatalogView: View {
                     }
                 }
             }
+            .overlay {
+                if viewModel.isLoading {
+                    ProgressView()
+                }
+            }
         }
         .padding(.horizontal)
         .padding(.top, 12)
         .background(Color.white)
         .navigationTitle("Add Excercise")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await viewModel.loadPopular()
+        }
+        .onChange(of: searchText) { _, newValue in
+            Task { await viewModel.search(text: newValue) }
+        }
+        .sheet(isPresented: $showMusclePicker) {
+            CategoryPickerView(title: "Muscles", items: viewModel.bodyParts) { selection in
+                Task { await viewModel.filterByBodyPart(selection) }
+            }
+            .task { await viewModel.loadBodyParts() }
+        }
+        .sheet(isPresented: $showEquipmentPicker) {
+            CategoryPickerView(title: "Equipment", items: viewModel.equipment) { selection in
+                Task { await viewModel.filterByEquipment(selection) }
+            }
+            .task { await viewModel.loadEquipment() }
+        }
     }
 
-    private func filteredExercises(from list: [ExerciseCatalogItem]) -> [ExerciseCatalogItem] {
-        guard !searchText.isEmpty else { return list }
-        return list.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    private func displayedExercises(recent: [ExerciseCatalogItem]) -> [ExerciseCatalogItem] {
+        if viewModel.hasActiveFilter || !searchText.isEmpty {
+            return viewModel.displayedExercises
+        }
+        return recent.isEmpty ? viewModel.popularExercises : recent
     }
 }
 
@@ -116,35 +142,243 @@ private struct ExerciseIconView: View {
     let imageURL: URL?
 
     var body: some View {
-        Group {
-            if let imageURL {
-                AsyncImage(url: imageURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().scaledToFill()
-                    default:
-                        Image(systemName: "figure.strengthtraining.traditional")
-                            .resizable()
-                            .scaledToFit()
-                            .padding(10)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } else {
-                Image(systemName: "figure.strengthtraining.traditional")
-                    .resizable()
-                    .scaledToFit()
-                    .padding(10)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(width: 56, height: 56)
-        .background(Color(white: 0.95))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        RemoteThumbnailView(
+            imageURL: imageURL,
+            size: 56,
+            cornerRadius: 10,
+            placeholder: placeholder
+        )
+    }
+
+    private var placeholder: some View {
+        Image(systemName: "figure.strengthtraining.traditional")
+            .resizable()
+            .scaledToFit()
+            .padding(10)
+            .foregroundStyle(.secondary)
+            .frame(width: 56, height: 56)
+            .background(Color(white: 0.95))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+// MARK: - Reusable Row Thumbnail
+
+struct ExerciseRowThumbnail: View {
+    let imageURL: URL?
+
+    var body: some View {
+        RemoteThumbnailView(
+            imageURL: imageURL,
+            size: 28,
+            cornerRadius: 6,
+            placeholder: placeholder
+        )
+    }
+
+    private var placeholder: some View {
+        Image(systemName: "figure.strengthtraining.traditional")
+            .resizable()
+            .scaledToFit()
+            .padding(4)
+            .foregroundStyle(.secondary)
+            .frame(width: 28, height: 28)
+            .background(Color(white: 0.95))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }
 
 #Preview {
     AddExerciseCatalogView { _ in }
         .environmentObject(RoutineStore())
+}
+
+// MARK: - View Model
+
+@MainActor
+final class ExerciseCatalogViewModel: ObservableObject {
+    @Published var displayedExercises: [ExerciseCatalogItem] = []
+    @Published var popularExercises: [ExerciseCatalogItem] = []
+    @Published var bodyParts: [String] = []
+    @Published var equipment: [String] = []
+    @Published var isLoading = false
+    @Published var hasActiveFilter = false
+
+    private let service = ExerciseDBService()
+    private var currentTask: Task<Void, Never>?
+
+    func loadPopular() async {
+        guard popularExercises.isEmpty else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let exercises = try await service.fetchAllExercises()
+            popularExercises = exercises.prefix(20).map(mapToCatalogItem)
+        } catch {
+            popularExercises = []
+        }
+    }
+
+    func search(text: String) async {
+        currentTask?.cancel()
+        guard !text.isEmpty else {
+            displayedExercises = []
+            hasActiveFilter = false
+            return
+        }
+
+        currentTask = Task {
+            isLoading = true
+            defer { isLoading = false }
+            do {
+                let exercises = try await service.searchExercises(name: text)
+                displayedExercises = exercises.map(mapToCatalogItem)
+                hasActiveFilter = true
+            } catch {
+                displayedExercises = []
+            }
+        }
+    }
+
+    func loadBodyParts() async {
+        if !bodyParts.isEmpty { return }
+        do {
+            bodyParts = try await service.bodyPartList()
+        } catch {
+            bodyParts = []
+        }
+    }
+
+    func loadEquipment() async {
+        if !equipment.isEmpty { return }
+        do {
+            equipment = try await service.equipmentList()
+        } catch {
+            equipment = []
+        }
+    }
+
+    func filterByBodyPart(_ bodyPart: String) async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let exercises = try await service.exercises(bodyPart: bodyPart)
+            displayedExercises = exercises.map(mapToCatalogItem)
+            hasActiveFilter = true
+        } catch {
+            displayedExercises = []
+        }
+    }
+
+    func filterByEquipment(_ equipment: String) async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let exercises = try await service.exercises(equipment: equipment)
+            displayedExercises = exercises.map(mapToCatalogItem)
+            hasActiveFilter = true
+        } catch {
+            displayedExercises = []
+        }
+    }
+
+    func sectionTitle(recentIsEmpty: Bool) -> String {
+        if hasActiveFilter { return "Results" }
+        return recentIsEmpty ? "Popular" : "Recent"
+    }
+
+    private func mapToCatalogItem(_ exercise: ExerciseDBExercise) -> ExerciseCatalogItem {
+        // ExerciseDB image endpoint expects numeric resolution (e.g., 180/360/720/1080).
+        // Basic plan supports 180 only.
+        let imageURL = ExerciseDBConfig.baseURL
+            .appendingPathComponent("image")
+            .appending(queryItems: [
+                URLQueryItem(name: "resolution", value: "180"),
+                URLQueryItem(name: "exerciseId", value: exercise.id)
+            ])
+        return ExerciseCatalogItem(
+            id: exercise.id,
+            name: exercise.name.capitalized,
+            muscle: exercise.target.capitalized,
+            equipment: exercise.equipment.capitalized,
+            imageURL: imageURL
+        )
+    }
+}
+
+// MARK: - Category Picker
+
+private struct CategoryPickerView: View {
+    let title: String
+    let items: [String]
+    var onSelect: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(items, id: \.self) { item in
+                    Button(item.capitalized) {
+                        onSelect(item)
+                        dismiss()
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(Color.white)
+            .navigationTitle(title)
+        }
+    }
+}
+
+// MARK: - Remote Thumbnail
+
+struct RemoteThumbnailView<Placeholder: View>: View {
+    let imageURL: URL?
+    let size: CGFloat
+    let cornerRadius: CGFloat
+    let placeholder: Placeholder
+
+    @State private var image: Image?
+
+    var body: some View {
+        Group {
+            if let image {
+                image
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            } else {
+                placeholder
+            }
+        }
+        .task(id: imageURL) {
+            await loadImage()
+        }
+    }
+
+    private func loadImage() async {
+        guard let url = imageURL else { return }
+        do {
+            var request = URLRequest(url: url)
+            if url.host?.contains("rapidapi.com") == true {
+                request.setValue(ExerciseDBConfig.apiKey, forHTTPHeaderField: "X-RapidAPI-Key")
+                request.setValue(ExerciseDBConfig.host, forHTTPHeaderField: "X-RapidAPI-Host")
+            }
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  200..<300 ~= httpResponse.statusCode,
+                  let uiImage = UIImage(data: data) else {
+                return
+            }
+
+            image = Image(uiImage: uiImage)
+        } catch {
+            // Keep placeholder on failure.
+        }
+    }
 }

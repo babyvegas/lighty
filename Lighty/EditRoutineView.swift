@@ -37,8 +37,7 @@ struct EditRoutineView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 HStack(spacing: 8) {
-                                    Image(systemName: "dumbbell")
-                                        .font(.subheadline)
+                                    ExerciseRowThumbnail(imageURL: exercise.imageURL)
                                     Text(exercise.name)
                                         .font(.headline)
                                 }
@@ -143,8 +142,9 @@ struct EditRoutineView: View {
                 if let replaceID = exerciseToReplace,
                    let index = routine.exercises.firstIndex(where: { $0.id == replaceID }) {
                     routine.exercises[index].name = selected.name
+                    routine.exercises[index].imageURL = selected.imageURL
                 } else {
-                    routine.exercises.append(ExerciseEntry(name: selected.name))
+                    routine.exercises.append(ExerciseEntry(name: selected.name, imageURL: selected.imageURL))
                 }
                 exerciseToReplace = nil
                 showExercisePicker = false

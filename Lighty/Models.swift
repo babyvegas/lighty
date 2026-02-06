@@ -55,3 +55,11 @@ struct Routine: Identifiable, Hashable {
         self.exercises = exercises
     }
 }
+
+struct ExerciseCatalogItem: Identifiable, Hashable {
+    let id: String
+    var name: String
+    var muscle: String
+    var equipment: String
+    var imageURL: URL?
+}

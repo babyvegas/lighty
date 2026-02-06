@@ -5,8 +5,8 @@ internal import Combine
 // MARK: - Store
 
 final class RoutineStore: ObservableObject {
-    
     @Published private(set) var routines: [Routine] = []
+    @Published private(set) var recentExercises: [ExerciseCatalogItem] = []
 
     func save(_ routine: Routine) {
         if let index = routines.firstIndex(where: { $0.id == routine.id }) {
@@ -32,5 +32,13 @@ final class RoutineStore: ObservableObject {
             exercises: routine.exercises
         )
         routines.append(copy)
+    }
+
+    func addRecentExercise(_ exercise: ExerciseCatalogItem) {
+        recentExercises.removeAll { $0.id == exercise.id }
+        recentExercises.insert(exercise, at: 0)
+        if recentExercises.count > 10 {
+            recentExercises = Array(recentExercises.prefix(10))
+        }
     }
 }

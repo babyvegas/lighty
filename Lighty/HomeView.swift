@@ -34,15 +34,39 @@ struct HomeView: View {
                         .fontWeight(.bold)
 
                     VStack(spacing: 12) {
-                        NavigationLink("New Routine") {
-                            RoutineDetailView(mode: .create)
-                        }
-                        .buttonStyle(.plain)
+                        HStack(spacing: 12) {
+                            NavigationLink {
+                                RoutineDetailView(mode: .create)
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "book")
+                                    Text("New Routine")
+                                        .fontWeight(.semibold)
+                                    Spacer()
+                                }
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color(white: 0.92))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            }
+                            .buttonStyle(.plain)
 
-                        NavigationLink("Explore Routines") {
-                            ExploreRoutinesView()
+                            NavigationLink {
+                                ExploreRoutinesView()
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "magnifyingglass")
+                                    Text("Explore")
+                                        .fontWeight(.semibold)
+                                    Spacer()
+                                }
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color(white: 0.92))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
 
                         if store.routines.isEmpty {
                             Text("No routines yet")

@@ -139,12 +139,12 @@ struct EditRoutineView: View {
             }
         }
         .sheet(isPresented: $showExercisePicker) {
-            ExercisePickerView { selectedName in
+            AddExerciseCatalogView { selected in
                 if let replaceID = exerciseToReplace,
                    let index = routine.exercises.firstIndex(where: { $0.id == replaceID }) {
-                    routine.exercises[index].name = selectedName
+                    routine.exercises[index].name = selected.name
                 } else {
-                    routine.exercises.append(ExerciseEntry(name: selectedName))
+                    routine.exercises.append(ExerciseEntry(name: selected.name))
                 }
                 exerciseToReplace = nil
                 showExercisePicker = false

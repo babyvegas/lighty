@@ -61,8 +61,8 @@ struct RoutineDetailView: View {
             }
         }
         .sheet(isPresented: $showExercisePicker) {
-            ExercisePickerView { selectedName in
-                addExercise(named: selectedName)
+            AddExerciseCatalogView { selected in
+                addExercise(named: selected.name)
                 showExercisePicker = false
             }
         }

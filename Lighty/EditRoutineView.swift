@@ -12,6 +12,7 @@ struct EditRoutineView: View {
     @State private var exerciseToReplace: ExerciseEntry.ID?
     @State private var showRestPicker = false
     @State private var restExerciseID: ExerciseEntry.ID?
+    @State private var selectedExerciseID: ExerciseEntry.ID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,12 +37,17 @@ struct EditRoutineView: View {
                     ForEach($routine.exercises) { $exercise in
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
-                                HStack(spacing: 8) {
-                                    ExerciseRowThumbnail(imageURL: exercise.imageURL)
-                                    Text(exercise.name)
-                                        .font(.headline)
+                                Button {
+                                    selectedExerciseID = exercise.id
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        ExerciseRowThumbnail(imageURL: exercise.imageURL)
+                                        Text(exercise.name)
+                                            .font(.headline)
+                                            .foregroundStyle(.blue)
+                                    }
                                 }
-                                .foregroundStyle(.blue)
+                                .buttonStyle(.plain)
 
                                 Spacer()
 
@@ -143,8 +149,19 @@ struct EditRoutineView: View {
                    let index = routine.exercises.firstIndex(where: { $0.id == replaceID }) {
                     routine.exercises[index].name = selected.name
                     routine.exercises[index].imageURL = selected.imageURL
+                    routine.exercises[index].mediaURL = selected.mediaURL
+                    routine.exercises[index].primaryMuscle = selected.primaryMuscle
+                    routine.exercises[index].secondaryMuscles = selected.secondaryMuscles
                 } else {
-                    routine.exercises.append(ExerciseEntry(name: selected.name, imageURL: selected.imageURL))
+                    routine.exercises.append(
+                        ExerciseEntry(
+                            name: selected.name,
+                            imageURL: selected.imageURL,
+                            mediaURL: selected.mediaURL,
+                            primaryMuscle: selected.primaryMuscle,
+                            secondaryMuscles: selected.secondaryMuscles
+                        )
+                    )
                 }
                 exerciseToReplace = nil
                 showExercisePicker = false
@@ -156,6 +173,17 @@ struct EditRoutineView: View {
         .sheet(isPresented: $showRestPicker) {
             if let binding = restBinding() {
                 RestPickerView(restMinutes: binding)
+            }
+        }
+        .sheet(
+            isPresented: Binding(
+                get: { selectedExerciseID != nil },
+                set: { if !$0 { selectedExerciseID = nil } }
+            )
+        ) {
+            if let id = selectedExerciseID,
+               let binding = exerciseBinding(for: id) {
+                ExerciseInsightsView(exercise: binding)
             }
         }
     }
@@ -222,6 +250,17 @@ struct EditRoutineView: View {
         return Binding(
             get: { routine.exercises[index].restMinutes },
             set: { routine.exercises[index].restMinutes = $0 }
+        )
+    }
+
+    private func exerciseBinding(for id: ExerciseEntry.ID) -> Binding<ExerciseEntry>? {
+        guard let index = routine.exercises.firstIndex(where: { $0.id == id }) else {
+            return nil
+        }
+
+        return Binding(
+            get: { routine.exercises[index] },
+            set: { routine.exercises[index] = $0 }
         )
     }
 }

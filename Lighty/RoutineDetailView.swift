@@ -75,7 +75,15 @@ struct RoutineDetailView: View {
     }
 
     private func addExercise(from catalog: ExerciseCatalogItem) {
-        routine.exercises.append(ExerciseEntry(name: catalog.name, imageURL: catalog.imageURL))
+        routine.exercises.append(
+            ExerciseEntry(
+                name: catalog.name,
+                imageURL: catalog.imageURL,
+                mediaURL: catalog.mediaURL,
+                primaryMuscle: catalog.primaryMuscle,
+                secondaryMuscles: catalog.secondaryMuscles
+            )
+        )
     }
 
     private func saveRoutine() {
@@ -88,14 +96,21 @@ struct RoutineDetailView: View {
 private struct ExerciseEditorView: View {
     @Binding var exercise: ExerciseEntry
     @State private var showRestPicker = false
+    @State private var showInsights = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                ExerciseRowThumbnail(imageURL: exercise.imageURL)
-                Text(exercise.name)
-                    .font(.headline)
+            Button {
+                showInsights = true
+            } label: {
+                HStack(spacing: 8) {
+                    ExerciseRowThumbnail(imageURL: exercise.imageURL)
+                    Text(exercise.name)
+                        .font(.headline)
+                        .foregroundStyle(.blue)
+                }
             }
+            .buttonStyle(.plain)
 
             TextField("Write your notes here", text: $exercise.notes, axis: .vertical)
                 .lineLimit(3, reservesSpace: true)
@@ -144,6 +159,9 @@ private struct ExerciseEditorView: View {
         }
         .sheet(isPresented: $showRestPicker) {
             RestPickerView(restMinutes: $exercise.restMinutes)
+        }
+        .sheet(isPresented: $showInsights) {
+            ExerciseInsightsView(exercise: $exercise)
         }
     }
 

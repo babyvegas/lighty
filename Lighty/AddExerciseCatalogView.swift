@@ -320,7 +320,10 @@ final class ExerciseCatalogViewModel: ObservableObject {
             name: exercise.name.capitalized,
             muscle: exercise.target.capitalized,
             equipment: exercise.equipment.capitalized,
-            imageURL: imageURL
+            imageURL: imageURL,
+            mediaURL: exercise.gifUrl.flatMap(URL.init(string:)),
+            primaryMuscle: exercise.target.capitalized,
+            secondaryMuscles: [exercise.bodyPart.capitalized]
         )
     }
 }

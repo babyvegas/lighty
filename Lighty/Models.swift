@@ -19,6 +19,9 @@ struct ExerciseEntry: Identifiable, Hashable {
     var name: String
     var notes: String
     var imageURL: URL?
+    var mediaURL: URL?
+    var primaryMuscle: String
+    var secondaryMuscles: [String]
     var sets: [WorkoutSet]
     /// 0 means rest timer is off. Values are in minutes, with 0.5 increments.
     var restMinutes: Double
@@ -28,6 +31,9 @@ struct ExerciseEntry: Identifiable, Hashable {
         name: String,
         notes: String = "",
         imageURL: URL? = nil,
+        mediaURL: URL? = nil,
+        primaryMuscle: String = "Unknown",
+        secondaryMuscles: [String] = [],
         sets: [WorkoutSet] = [WorkoutSet(), WorkoutSet()],
         restMinutes: Double = 0
     ) {
@@ -35,6 +41,9 @@ struct ExerciseEntry: Identifiable, Hashable {
         self.name = name
         self.notes = notes
         self.imageURL = imageURL
+        self.mediaURL = mediaURL
+        self.primaryMuscle = primaryMuscle
+        self.secondaryMuscles = secondaryMuscles
         self.sets = sets
         self.restMinutes = restMinutes
     }
@@ -65,4 +74,7 @@ struct ExerciseCatalogItem: Identifiable, Hashable {
     var muscle: String
     var equipment: String
     var imageURL: URL?
+    var mediaURL: URL?
+    var primaryMuscle: String
+    var secondaryMuscles: [String]
 }

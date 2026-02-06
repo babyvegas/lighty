@@ -15,8 +15,8 @@ struct RoutineDetailView: View {
     @State private var showExercisePicker = false
 
     var body: some View {
-        List {
-            Section {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 10) {
                     TextField("", text: $routine.name, prompt: Text("New Routine"))
                         .font(.title2)
@@ -27,10 +27,11 @@ struct RoutineDetailView: View {
                         .lineLimit(3, reservesSpace: true)
                         .textFieldStyle(.plain)
                 }
-                .padding(.vertical, 4)
-            }
 
-            Section {
+                Text("Exercises")
+                    .font(.title3)
+                    .fontWeight(.bold)
+
                 if routine.exercises.isEmpty {
                     Text("No exercises yet")
                         .foregroundStyle(.secondary)
@@ -45,12 +46,13 @@ struct RoutineDetailView: View {
                     showExercisePicker = true
                 }
                 .padding(.vertical, 6)
-            } header: {
-                Text("Exercises")
             }
+            .padding(.horizontal)
+            .padding(.top, 8)
         }
-        .listStyle(.insetGrouped)
-        .navigationTitle(routine.name.isEmpty ? "Routine" : routine.name)
+        .background(Color.white)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Save") {
@@ -96,6 +98,13 @@ private struct ExerciseEditorView: View {
                 .lineLimit(3, reservesSpace: true)
                 .textFieldStyle(.plain)
 
+            Button(restLabel) {
+                showRestPicker = true
+            }
+            .font(.subheadline)
+            .padding(.vertical, 6)
+            .buttonStyle(.borderless)
+
             setHeaderRow
 
             ForEach(exercise.sets.indices, id: \.self) { index in
@@ -115,21 +124,20 @@ private struct ExerciseEditorView: View {
                 }
             }
 
-            Button(restLabel) {
-                showRestPicker = true
-            }
-            .font(.subheadline)
-            .padding(.vertical, 6)
-            .buttonStyle(.borderless)
-
             Spacer()
                 .frame(height: 6)
 
-            Button("Add Set") {
+            Button {
                 exercise.sets.append(WorkoutSet())
+            } label: {
+                Text("+ Add Set")
+                    .fontWeight(.semibold)
             }
-            .padding(.vertical, 4)
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(Color(white: 0.92))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .sheet(isPresented: $showRestPicker) {
             RestPickerView(restMinutes: $exercise.restMinutes)
@@ -164,7 +172,7 @@ private struct ExerciseEditorView: View {
     }
 }
 
-private struct RestPickerView: View {
+struct RestPickerView: View {
     @Binding var restMinutes: Double
     @Environment(\.dismiss) private var dismiss
 
@@ -182,6 +190,8 @@ private struct RestPickerView: View {
                 .pickerStyle(.inline)
             }
             .navigationTitle("Rest Timer")
+            .scrollContentBackground(.hidden)
+            .background(Color.white)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {

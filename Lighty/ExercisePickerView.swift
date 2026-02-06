@@ -21,6 +21,8 @@ struct ExercisePickerView: View {
                 }
             }
             .navigationTitle("Add Exercise")
+            .scrollContentBackground(.hidden)
+            .background(Color.white)
         }
     }
 }

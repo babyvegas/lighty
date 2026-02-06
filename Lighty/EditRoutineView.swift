@@ -19,20 +19,14 @@ struct EditRoutineView: View {
             headerBar
                 .padding(.horizontal)
                 .padding(.top, 10)
-                .padding(.bottom, 6)
+                .padding(.bottom, 8)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    TextField("", text: $routine.name, prompt: Text("New Routine"))
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .textFieldStyle(.plain)
-
-                    if !routine.description.isEmpty {
-                        Text(routine.description)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                    TextField("New Routine", text: $routine.name)
+                        .font(.title2.bold())
+                        .foregroundStyle(StyleKit.ink)
+                        .appCard(padding: 14, radius: 16)
 
                     ForEach($routine.exercises) { $exercise in
                         VStack(alignment: .leading, spacing: 12) {
@@ -44,7 +38,7 @@ struct EditRoutineView: View {
                                         ExerciseRowThumbnail(imageURL: exercise.imageURL)
                                         Text(exercise.name)
                                             .font(.headline)
-                                            .foregroundStyle(.blue)
+                                            .foregroundStyle(StyleKit.accentBlue)
                                     }
                                 }
                                 .buttonStyle(.plain)
@@ -67,22 +61,25 @@ struct EditRoutineView: View {
                                         Text("Delete excercise")
                                     }
                                 } label: {
-                                    Image(systemName: "ellipsis")
-                                        .foregroundStyle(.black)
+                                    Image(systemName: "ellipsis.circle.fill")
+                                        .font(.title3)
+                                        .foregroundStyle(StyleKit.softInk)
                                 }
                             }
 
                             TextField("Write your notes here", text: $exercise.notes, axis: .vertical)
                                 .lineLimit(3, reservesSpace: true)
-                                .textFieldStyle(.plain)
+                                .padding(10)
+                                .background(StyleKit.softChip.opacity(0.75))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
 
                             Button(restLabel(for: exercise)) {
                                 restExerciseID = exercise.id
                                 showRestPicker = true
                             }
-                            .font(.subheadline)
-                            .padding(.vertical, 6)
-                            .buttonStyle(.borderless)
+                            .buttonStyle(.plain)
+                            .foregroundStyle(StyleKit.accentBlue)
+                            .font(.subheadline.weight(.semibold))
 
                             setHeaderRow
 
@@ -90,6 +87,7 @@ struct EditRoutineView: View {
                                 HStack(spacing: 12) {
                                     Text("\(index + 1)")
                                         .frame(width: 30, alignment: .leading)
+                                        .foregroundStyle(StyleKit.softInk)
 
                                     TextField("0", value: $exercise.sets[index].weight, format: .number)
                                         .keyboardType(.numberPad)
@@ -101,42 +99,44 @@ struct EditRoutineView: View {
                                         .textFieldStyle(.plain)
                                         .frame(width: 80)
                                 }
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 6)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(index.isMultiple(of: 2) ? Color.white : Color(white: 0.95))
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 10)
+                                .background(index.isMultiple(of: 2) ? Color.white.opacity(0.42) : StyleKit.softChip.opacity(0.75))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
                             }
-
-                            Spacer()
-                                .frame(height: 6)
 
                             Button {
                                 exercise.sets.append(WorkoutSet())
                             } label: {
-                                Text("+ Add Set")
-                                    .fontWeight(.semibold)
+                                HStack {
+                                    Image(systemName: "plus")
+                                    Text("Add Set")
+                                }
                             }
-                            .buttonStyle(.plain)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(Color(white: 0.92))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .buttonStyle(SoftFillButtonStyle())
                         }
-                        .padding(.vertical, 8)
+                        .appCard(padding: 14, radius: 16)
                     }
 
-                    Button("Add excercise") {
+                    Button {
                         showExercisePicker = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "plus.circle.fill")
+                            Text("Add excercise")
+                            Spacer()
+                        }
                     }
-                    .padding(.vertical, 6)
+                    .buttonStyle(SoftFillButtonStyle())
                 }
                 .padding(.horizontal)
                 .padding(.top, 8)
+                .padding(.bottom, 120)
             }
-            .background(Color.white)
+            .scrollIndicators(.hidden)
+            .background(Color.clear)
         }
-        .background(Color.white)
+        .background(Color.clear)
         .navigationBarHidden(true)
         .onAppear {
             if let existing = store.routine(with: routineID) {
@@ -193,12 +193,13 @@ struct EditRoutineView: View {
             Button("Cancel") {
                 dismiss()
             }
-            .foregroundStyle(.blue)
+            .foregroundStyle(StyleKit.accentBlue)
 
             Spacer()
 
             Text("Edit Routine")
                 .fontWeight(.semibold)
+                .foregroundStyle(StyleKit.ink)
 
             Spacer()
 
@@ -206,25 +207,25 @@ struct EditRoutineView: View {
                 store.save(routine)
                 dismiss()
             }
-            .foregroundStyle(.blue)
+            .foregroundStyle(StyleKit.accentBlue)
         }
     }
 
     private var setHeaderRow: some View {
         HStack(spacing: 12) {
             Text("Set")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(StyleKit.softInk)
                 .frame(width: 30, alignment: .leading)
 
             Text("Weight (LBS)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(StyleKit.softInk)
                 .frame(width: 110, alignment: .leading)
 
             Text("Reps")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(StyleKit.softInk)
                 .frame(width: 80, alignment: .leading)
         }
     }
@@ -275,20 +276,22 @@ private struct ReorderExercisesView: View {
                 ForEach(exercises) { exercise in
                     HStack(spacing: 8) {
                         Image(systemName: "line.3.horizontal")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(StyleKit.softInk)
                         Text(exercise.name)
+                            .foregroundStyle(StyleKit.ink)
                     }
                 }
                 .onMove(perform: move)
             }
             .scrollContentBackground(.hidden)
-            .background(Color.white)
+            .background(AppBackgroundLayer())
             .navigationTitle("Re-organize")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()
                     }
+                    .foregroundStyle(StyleKit.accentBlue)
                 }
             }
         }

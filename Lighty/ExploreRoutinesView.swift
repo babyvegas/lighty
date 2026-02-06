@@ -2,14 +2,26 @@ import SwiftUI
 
 struct ExploreRoutinesView: View {
     var body: some View {
-        VStack(spacing: 12) {
-            Text("Explore Routines")
-                .font(.title2)
-                .fontWeight(.semibold)
-            Text("Placeholder screen for curated routines.")
-                .foregroundStyle(.secondary)
+        ZStack {
+            AppBackgroundLayer()
+
+            VStack(spacing: 14) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 48))
+                    .foregroundStyle(StyleKit.accentPink)
+
+                Text("Explore Routines")
+                    .font(.title2.bold())
+                    .foregroundStyle(StyleKit.ink)
+
+                Text("Template: curated plans, favorites, and community picks.")
+                    .font(.subheadline)
+                    .foregroundStyle(StyleKit.softInk)
+                    .multilineTextAlignment(.center)
+            }
+            .appCard(padding: 22, radius: 22)
+            .padding(.horizontal)
         }
-        .padding()
         .navigationTitle("Explore")
     }
 }

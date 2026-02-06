@@ -23,93 +23,88 @@ struct AddExerciseCatalogView: View {
     @State private var showEquipmentPicker = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Spacer()
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    TextField("Search exercises", text: $searchText)
-                        .textFieldStyle(.plain)
-                }
-                .padding(.vertical, 10)
-                .padding(.horizontal, 12)
-                .background(Color(white: 0.92))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .frame(maxWidth: 360)
-                Spacer()
-            }
+        NavigationStack {
+            ZStack {
+                AppBackgroundLayer()
 
-            HStack(spacing: 12) {
-                Button("Muscles") {
-                    showMusclePicker = true
-                }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color(white: 0.92))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 16) {
+                    searchBar
 
-                Button("Equipment") {
-                    showEquipmentPicker = true
-                }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color(white: 0.92))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-
-            let recent = store.recentExercises
-            Text(viewModel.sectionTitle(recentIsEmpty: recent.isEmpty))
-                .font(.headline)
-
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(displayedExercises(recent: recent)) { exercise in
+                    HStack(spacing: 12) {
                         Button {
-                            store.addRecentExercise(exercise)
-                            onSelect(exercise)
-                            dismiss()
+                            showMusclePicker = true
                         } label: {
-                            HStack(spacing: 12) {
-                                ExerciseIconView(imageURL: exercise.imageURL)
-
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(exercise.name)
-                                        .fontWeight(.semibold)
-                                    Text("Muscle: \(exercise.muscle)")
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
-                                    Text("Equipment: \(exercise.equipment)")
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                Spacer()
+                            HStack(spacing: 8) {
+                                Image(systemName: "bolt.heart")
+                                Text("Muscles")
                             }
-                            .padding()
-                            .background(Color.white)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color(white: 0.85), lineWidth: 1)
-                            )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(SoftFillButtonStyle())
+
+                        Button {
+                            showEquipmentPicker = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "dumbbell.fill")
+                                Text("Equipment")
+                            }
+                        }
+                        .buttonStyle(SoftFillButtonStyle())
+                    }
+
+                    let recent = store.recentExercises
+                    Text(viewModel.sectionTitle(recentIsEmpty: recent.isEmpty))
+                        .font(.headline)
+                        .foregroundStyle(StyleKit.ink)
+
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(displayedExercises(recent: recent)) { exercise in
+                                Button {
+                                    store.addRecentExercise(exercise)
+                                    onSelect(exercise)
+                                    dismiss()
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        ExerciseIconView(imageURL: exercise.imageURL)
+
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(exercise.name)
+                                                .fontWeight(.semibold)
+                                                .foregroundStyle(StyleKit.ink)
+
+                                            Text("Muscle: \(exercise.muscle)")
+                                                .font(.footnote)
+                                                .foregroundStyle(StyleKit.softInk)
+
+                                            Text("Equipment: \(exercise.equipment)")
+                                                .font(.footnote)
+                                                .foregroundStyle(StyleKit.softInk)
+                                        }
+
+                                        Spacer()
+                                    }
+                                    .appCard(padding: 12, radius: 14)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.bottom, 24)
+                    }
+                    .scrollIndicators(.hidden)
+                    .overlay {
+                        if viewModel.isLoading {
+                            ProgressView()
+                                .tint(StyleKit.accentBlue)
+                        }
                     }
                 }
+                .padding(.horizontal)
+                .padding(.top, 12)
             }
-            .overlay {
-                if viewModel.isLoading {
-                    ProgressView()
-                }
-            }
+            .navigationTitle("Add Exercise")
+            .navigationBarTitleDisplayMode(.inline)
         }
-        .padding(.horizontal)
-        .padding(.top, 12)
-        .background(Color.white)
-        .navigationTitle("Add Excercise")
-        .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.loadPopular()
         }
@@ -130,6 +125,20 @@ struct AddExerciseCatalogView: View {
         }
     }
 
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(StyleKit.softInk)
+
+            TextField("Search exercises", text: $searchText)
+                .textFieldStyle(.plain)
+                .foregroundStyle(StyleKit.ink)
+        }
+        .padding(.vertical, 11)
+        .padding(.horizontal, 12)
+        .appCard(padding: 0, radius: 14)
+    }
+
     private func displayedExercises(recent: [ExerciseCatalogItem]) -> [ExerciseCatalogItem] {
         if viewModel.hasActiveFilter || !searchText.isEmpty {
             return viewModel.displayedExercises
@@ -144,8 +153,8 @@ private struct ExerciseIconView: View {
     var body: some View {
         RemoteThumbnailView(
             imageURL: imageURL,
-            size: 56,
-            cornerRadius: 10,
+            size: 58,
+            cornerRadius: 12,
             placeholder: placeholder
         )
     }
@@ -155,10 +164,10 @@ private struct ExerciseIconView: View {
             .resizable()
             .scaledToFit()
             .padding(10)
-            .foregroundStyle(.secondary)
-            .frame(width: 56, height: 56)
-            .background(Color(white: 0.95))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .foregroundStyle(StyleKit.softInk)
+            .frame(width: 58, height: 58)
+            .background(StyleKit.softChip)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -170,8 +179,8 @@ struct ExerciseRowThumbnail: View {
     var body: some View {
         RemoteThumbnailView(
             imageURL: imageURL,
-            size: 28,
-            cornerRadius: 6,
+            size: 30,
+            cornerRadius: 8,
             placeholder: placeholder
         )
     }
@@ -181,10 +190,10 @@ struct ExerciseRowThumbnail: View {
             .resizable()
             .scaledToFit()
             .padding(4)
-            .foregroundStyle(.secondary)
-            .frame(width: 28, height: 28)
-            .background(Color(white: 0.95))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .foregroundStyle(StyleKit.softInk)
+            .frame(width: 30, height: 30)
+            .background(StyleKit.softChip)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -249,7 +258,6 @@ final class ExerciseCatalogViewModel: ObservableObject {
                     }
                 }
 
-                // Fallback to API search if local cache is empty or no matches found.
                 let exercises = try await service.searchExercises(name: query)
                 displayedExercises = exercises.map(mapToCatalogItem)
                 hasActiveFilter = true
@@ -307,14 +315,13 @@ final class ExerciseCatalogViewModel: ObservableObject {
     }
 
     private func mapToCatalogItem(_ exercise: ExerciseDBExercise) -> ExerciseCatalogItem {
-        // ExerciseDB image endpoint expects numeric resolution (e.g., 180/360/720/1080).
-        // Basic plan supports 180 only.
         let imageURL = ExerciseDBConfig.baseURL
             .appendingPathComponent("image")
             .appending(queryItems: [
                 URLQueryItem(name: "resolution", value: "180"),
                 URLQueryItem(name: "exerciseId", value: exercise.id)
             ])
+
         return ExerciseCatalogItem(
             id: exercise.id,
             name: exercise.name.capitalized,
@@ -339,16 +346,21 @@ private struct CategoryPickerView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(items, id: \.self) { item in
-                    Button(item.capitalized) {
-                        onSelect(item)
-                        dismiss()
+            ZStack {
+                AppBackgroundLayer()
+
+                List {
+                    ForEach(items, id: \.self) { item in
+                        Button(item.capitalized) {
+                            onSelect(item)
+                            dismiss()
+                        }
+                        .foregroundStyle(StyleKit.ink)
                     }
                 }
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
             }
-            .scrollContentBackground(.hidden)
-            .background(Color.white)
             .navigationTitle(title)
         }
     }

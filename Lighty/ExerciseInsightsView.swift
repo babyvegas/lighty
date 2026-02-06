@@ -13,35 +13,38 @@ struct ExerciseInsightsView: View {
     @State private var selectedSection: Section = .summary
 
     var body: some View {
-        VStack(spacing: 0) {
-            headerBar
+        ZStack {
+            AppBackgroundLayer()
 
-            sectionSelector
-                .padding(.horizontal)
-                .padding(.top, 10)
+            VStack(spacing: 0) {
+                headerBar
 
-            Rectangle()
-                .fill(Color(white: 0.9))
-                .frame(height: 1)
+                sectionSelector
+                    .padding(.horizontal)
+                    .padding(.top, 8)
 
-            ScrollView {
-                Group {
-                    switch selectedSection {
-                    case .summary:
-                        summaryView
-                    case .history:
-                        historyTemplate
-                    case .indications:
-                        indicationsTemplate
+                Rectangle()
+                    .fill(Color.white.opacity(0.8))
+                    .frame(height: 1)
+
+                ScrollView {
+                    Group {
+                        switch selectedSection {
+                        case .summary:
+                            summaryView
+                        case .history:
+                            historyTemplate
+                        case .indications:
+                            indicationsTemplate
+                        }
                     }
+                    .padding(.horizontal)
+                    .padding(.top, 14)
+                    .padding(.bottom, 26)
                 }
-                .padding(.horizontal)
-                .padding(.top, 14)
-                .padding(.bottom, 24)
+                .scrollIndicators(.hidden)
             }
-            .background(Color.white)
         }
-        .background(Color.white)
     }
 
     private var headerBar: some View {
@@ -51,7 +54,7 @@ struct ExerciseInsightsView: View {
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.headline)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(StyleKit.ink)
                     .frame(width: 30, height: 30)
             }
 
@@ -59,6 +62,7 @@ struct ExerciseInsightsView: View {
 
             Text(exercise.name)
                 .font(.headline)
+                .foregroundStyle(StyleKit.ink)
                 .lineLimit(1)
 
             Spacer()
@@ -69,7 +73,7 @@ struct ExerciseInsightsView: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.headline)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(StyleKit.ink)
                     .frame(width: 30, height: 30)
             }
         }
@@ -88,11 +92,11 @@ struct ExerciseInsightsView: View {
                         Text(item.rawValue)
                             .font(.subheadline)
                             .fontWeight(.semibold)
-                            .foregroundStyle(selectedSection == item ? .blue : .black)
+                            .foregroundStyle(selectedSection == item ? StyleKit.accentBlue : StyleKit.softInk)
                             .frame(maxWidth: .infinity)
 
                         Rectangle()
-                            .fill(selectedSection == item ? Color.blue : Color.clear)
+                            .fill(selectedSection == item ? StyleKit.accentBlue : Color.clear)
                             .frame(height: 2)
                     }
                     .frame(maxWidth: .infinity)
@@ -109,34 +113,37 @@ struct ExerciseInsightsView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(exercise.name)
-                    .font(.title3)
-                    .fontWeight(.bold)
+                    .font(.title3.bold())
+                    .foregroundStyle(StyleKit.ink)
 
                 Text("Primary muscle: \(exercise.primaryMuscle)")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(StyleKit.softInk)
 
                 Text("Secondary muscles: \(secondaryMuscleLabel)")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(StyleKit.softInk)
             }
+            .appCard(padding: 14, radius: 14)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Progress (Template)")
                     .font(.headline)
+                    .foregroundStyle(StyleKit.ink)
 
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(white: 0.95))
+                    .fill(Color.white.opacity(0.86))
                     .frame(height: 210)
                     .overlay {
                         VStack(spacing: 10) {
                             Image(systemName: "chart.xyaxis.line")
                                 .font(.title2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(StyleKit.softInk)
                             Text("History chart placeholder")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(StyleKit.softInk)
                         }
                     }
             }
+            .appCard(padding: 12, radius: 14)
         }
     }
 
@@ -144,32 +151,36 @@ struct ExerciseInsightsView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("History")
                 .font(.headline)
+                .foregroundStyle(StyleKit.ink)
 
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(white: 0.95))
+                .fill(Color.white.opacity(0.86))
                 .frame(height: 260)
                 .overlay(
                     Text("Template: session timeline and PR cards")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(StyleKit.softInk)
                 )
         }
+        .appCard(padding: 12, radius: 14)
     }
 
     private var indicationsTemplate: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Indications")
                 .font(.headline)
+                .foregroundStyle(StyleKit.ink)
 
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(white: 0.95))
+                .fill(Color.white.opacity(0.86))
                 .frame(height: 260)
                 .overlay(
                     Text("Template: coaching cues and safety indications")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(StyleKit.softInk)
                         .padding(.horizontal)
                         .multilineTextAlignment(.center)
                 )
         }
+        .appCard(padding: 12, radius: 14)
     }
 
     private var secondaryMuscleLabel: String {
@@ -188,16 +199,17 @@ private struct ExerciseMediaPanel: View {
     }
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 14)
-            .fill(Color(white: 0.96))
+        RoundedRectangle(cornerRadius: 16)
+            .fill(Color.white.opacity(0.86))
             .frame(height: mediaHeight)
             .overlay {
                 mediaContent
             }
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
             .task(id: imageURL) {
                 await loadImage()
             }
+            .appCard(padding: 0, radius: 16)
     }
 
     @ViewBuilder
@@ -206,12 +218,13 @@ private struct ExerciseMediaPanel: View {
             loadedImage
                 .resizable()
                 .scaledToFit()
+                .padding(8)
         } else {
             Image(systemName: "figure.strengthtraining.traditional")
                 .resizable()
                 .scaledToFit()
                 .padding(36)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(StyleKit.softInk)
         }
     }
 

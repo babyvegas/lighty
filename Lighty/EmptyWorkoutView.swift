@@ -2,14 +2,26 @@ import SwiftUI
 
 struct EmptyWorkoutView: View {
     var body: some View {
-        VStack(spacing: 12) {
-            Text("New Empty Workout")
-                .font(.title2)
-                .fontWeight(.semibold)
-            Text("This is a placeholder for an empty workout flow.")
-                .foregroundStyle(.secondary)
+        ZStack {
+            AppBackgroundLayer()
+
+            VStack(spacing: 14) {
+                Image(systemName: "bolt.heart.fill")
+                    .font(.system(size: 52))
+                    .foregroundStyle(StyleKit.accentBlue)
+
+                Text("New Empty Workout")
+                    .font(.title2.bold())
+                    .foregroundStyle(StyleKit.ink)
+
+                Text("Quick-start mode. Add exercises and go train.")
+                    .font(.subheadline)
+                    .foregroundStyle(StyleKit.softInk)
+                    .multilineTextAlignment(.center)
+            }
+            .appCard(padding: 22, radius: 22)
+            .padding(.horizontal)
         }
-        .padding()
         .navigationTitle("Workout")
     }
 }

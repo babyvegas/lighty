@@ -17,40 +17,47 @@ struct RoutineDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 10) {
-                    TextField("", text: $routine.name, prompt: Text("New Routine"))
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .textFieldStyle(.plain)
+                routineHeader
 
-                    TextField("Routine description", text: $routine.description, axis: .vertical)
-                        .lineLimit(3, reservesSpace: true)
-                        .textFieldStyle(.plain)
+                HStack {
+                    Text("Exercises")
+                        .font(.title3.bold())
+                        .foregroundStyle(StyleKit.ink)
+                    Spacer()
+                    Text("\(routine.exercises.count)")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(StyleKit.accentBlue)
                 }
 
-                Text("Exercises")
-                    .font(.title3)
-                    .fontWeight(.bold)
-
                 if routine.exercises.isEmpty {
-                    Text("No exercises yet")
-                        .foregroundStyle(.secondary)
+                    Text("No exercises yet. Add your first one below.")
+                        .font(.subheadline)
+                        .foregroundStyle(StyleKit.softInk)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .appCard(padding: 14, radius: 14)
                 }
 
                 ForEach($routine.exercises) { $exercise in
                     ExerciseEditorView(exercise: $exercise)
-                        .padding(.vertical, 8)
                 }
 
-                Button("Add Exercise") {
+                Button {
                     showExercisePicker = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Add Exercise")
+                        Spacer()
+                    }
                 }
-                .padding(.vertical, 6)
+                .buttonStyle(SoftFillButtonStyle())
             }
             .padding(.horizontal)
-            .padding(.top, 8)
+            .padding(.top, 12)
+            .padding(.bottom, 120)
         }
-        .background(Color.white)
+        .scrollIndicators(.hidden)
+        .background(Color.clear)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -58,6 +65,7 @@ struct RoutineDetailView: View {
                 Button("Save") {
                     saveRoutine()
                 }
+                .foregroundStyle(StyleKit.accentBlue)
             }
         }
         .sheet(isPresented: $showExercisePicker) {
@@ -67,11 +75,23 @@ struct RoutineDetailView: View {
             }
         }
         .onAppear {
-            // Load existing routine data when editing.
             if case .edit(let id) = mode, let existing = store.routine(with: id) {
                 routine = existing
             }
         }
+    }
+
+    private var routineHeader: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            TextField("New Routine", text: $routine.name)
+                .font(.title2.bold())
+                .foregroundStyle(StyleKit.ink)
+
+            TextField("Routine description", text: $routine.description, axis: .vertical)
+                .lineLimit(3, reservesSpace: true)
+                .foregroundStyle(StyleKit.softInk)
+        }
+        .appCard(padding: 16, radius: 20)
     }
 
     private func addExercise(from catalog: ExerciseCatalogItem) {
@@ -87,7 +107,6 @@ struct RoutineDetailView: View {
     }
 
     private func saveRoutine() {
-        // Persist changes back into the shared store.
         store.save(routine)
         if case .edit = mode {
             store.recordTraining(from: routine)
@@ -110,21 +129,24 @@ private struct ExerciseEditorView: View {
                     ExerciseRowThumbnail(imageURL: exercise.imageURL)
                     Text(exercise.name)
                         .font(.headline)
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(StyleKit.accentBlue)
                 }
             }
             .buttonStyle(.plain)
 
             TextField("Write your notes here", text: $exercise.notes, axis: .vertical)
                 .lineLimit(3, reservesSpace: true)
-                .textFieldStyle(.plain)
+                .padding(10)
+                .background(StyleKit.softChip.opacity(0.75))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
 
             Button(restLabel) {
                 showRestPicker = true
             }
-            .font(.subheadline)
-            .padding(.vertical, 6)
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(StyleKit.accentBlue)
+            .padding(.vertical, 4)
 
             setHeaderRow
 
@@ -132,6 +154,7 @@ private struct ExerciseEditorView: View {
                 HStack(spacing: 12) {
                     Text("\(index + 1)")
                         .frame(width: 30, alignment: .leading)
+                        .foregroundStyle(StyleKit.softInk)
 
                     TextField("0", value: $exercise.sets[index].weight, format: .number)
                         .keyboardType(.numberPad)
@@ -143,23 +166,23 @@ private struct ExerciseEditorView: View {
                         .textFieldStyle(.plain)
                         .frame(width: 80)
                 }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(index.isMultiple(of: 2) ? Color.white.opacity(0.42) : StyleKit.softChip.opacity(0.75))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
             }
-
-            Spacer()
-                .frame(height: 6)
 
             Button {
                 exercise.sets.append(WorkoutSet())
             } label: {
-                Text("+ Add Set")
-                    .fontWeight(.semibold)
+                HStack {
+                    Image(systemName: "plus")
+                    Text("Add Set")
+                }
             }
-            .buttonStyle(.plain)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(Color(white: 0.92))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .buttonStyle(SoftFillButtonStyle())
         }
+        .appCard(padding: 14, radius: 16)
         .sheet(isPresented: $showRestPicker) {
             RestPickerView(restMinutes: $exercise.restMinutes)
         }
@@ -179,18 +202,18 @@ private struct ExerciseEditorView: View {
     private var setHeaderRow: some View {
         HStack(spacing: 12) {
             Text("Set")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(StyleKit.softInk)
                 .frame(width: 30, alignment: .leading)
 
             Text("Weight (LBS)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(StyleKit.softInk)
                 .frame(width: 110, alignment: .leading)
 
             Text("Reps")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(StyleKit.softInk)
                 .frame(width: 80, alignment: .leading)
         }
     }
@@ -215,12 +238,13 @@ struct RestPickerView: View {
             }
             .navigationTitle("Rest Timer")
             .scrollContentBackground(.hidden)
-            .background(Color.white)
+            .background(AppBackgroundLayer())
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()
                     }
+                    .foregroundStyle(StyleKit.accentBlue)
                 }
             }
         }

@@ -9,6 +9,10 @@ struct AppShellView: View {
 
     @State private var selectedTab: Tab = .training
     @AppStorage("lighty_preferred_theme") private var preferredTheme: String = "light"
+    @EnvironmentObject private var store: RoutineStore
+    @StateObject private var workoutSession = WorkoutSessionManager()
+    @State private var visibleToast: WorkoutCompletionToast?
+    @State private var toastDismissTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
@@ -25,23 +29,65 @@ struct AppShellView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .environmentObject(workoutSession)
         }
         .overlay(alignment: .bottom) {
-            VStack(spacing: 0) {
-                Rectangle()
-                    .fill(Color.white.opacity(0.75))
-                    .frame(height: 1)
-
-                HStack(spacing: 0) {
-                    navItem(title: "Home", icon: "house.fill", tab: .home)
-                    navItem(title: "Training", icon: "dumbbell.fill", tab: .training)
-                    navItem(title: "Profile", icon: "person.crop.circle", tab: .profile)
+            VStack(spacing: 8) {
+                if workoutSession.isActive && workoutSession.isMinimized {
+                    minimizedWorkoutBar
+                        .padding(.horizontal, 12)
                 }
-                .padding(.top, 6)
-                .frame(height: 72)
-                .background(Color.white.opacity(0.95))
+
+                VStack(spacing: 0) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.75))
+                        .frame(height: 1)
+
+                    HStack(spacing: 0) {
+                        navItem(title: "Home", icon: "house.fill", tab: .home)
+                        navItem(title: "Training", icon: "dumbbell.fill", tab: .training)
+                        navItem(title: "Profile", icon: "person.crop.circle", tab: .profile)
+                    }
+                    .padding(.top, 6)
+                    .frame(height: 72)
+                    .background(Color.white.opacity(0.95))
+                }
             }
             .ignoresSafeArea(edges: .bottom)
+        }
+        .fullScreenCover(isPresented: $workoutSession.isWorkoutPresented) {
+            WorkoutSessionView()
+                .environmentObject(store)
+                .environmentObject(workoutSession)
+        }
+        .overlay(alignment: .top) {
+            if let toast = visibleToast {
+                completionToastBanner(toast)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 12)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .onChange(of: workoutSession.completionToast) { _, newValue in
+            guard let newValue else { return }
+
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
+                visibleToast = newValue
+            }
+
+            toastDismissTask?.cancel()
+            toastDismissTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(3))
+                if Task.isCancelled { return }
+
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    visibleToast = nil
+                }
+
+                try? await Task.sleep(for: .milliseconds(250))
+                if Task.isCancelled { return }
+                workoutSession.clearCompletionToast()
+            }
         }
         .preferredColorScheme(preferredTheme == "dark" ? .dark : .light)
     }
@@ -62,6 +108,81 @@ struct AppShellView: View {
             .padding(.vertical, 8)
         }
         .buttonStyle(.plain)
+    }
+
+    private var minimizedWorkoutBar: some View {
+        Button {
+            workoutSession.restore()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "timer")
+                    .foregroundStyle(StyleKit.accentBlue)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(workoutSession.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(StyleKit.ink)
+                        .lineLimit(1)
+                    Text("In progress")
+                        .font(.caption)
+                        .foregroundStyle(StyleKit.softInk)
+                }
+
+                Spacer()
+
+                Text(workoutSession.elapsedLabel)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(StyleKit.accentBlue)
+
+                Image(systemName: "chevron.up")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(StyleKit.accentBlue)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color.white.opacity(0.96))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.white.opacity(0.9), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.05), radius: 10, y: 5)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func completionToastBanner(_ toast: WorkoutCompletionToast) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: toast.icon)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: 34, height: 34)
+                .background(Color.white.opacity(0.22))
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(toast.title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                Text(toast.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.92))
+                    .lineLimit(2)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            LinearGradient(
+                colors: [StyleKit.accentBlue, Color(red: 0.53, green: 0.40, blue: 0.98)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: StyleKit.accentBlue.opacity(0.35), radius: 16, y: 8)
     }
 }
 

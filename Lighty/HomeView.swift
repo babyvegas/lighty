@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject private var store: RoutineStore
+    @EnvironmentObject private var workoutSession: WorkoutSessionManager
 
     var body: some View {
         NavigationStack {
@@ -79,8 +80,8 @@ struct HomeView: View {
     }
 
     private var heroWorkoutButton: some View {
-        NavigationLink {
-            EmptyWorkoutView()
+        Button {
+            workoutSession.beginEmptyWorkout()
         } label: {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
@@ -211,8 +212,8 @@ struct HomeView: View {
                 }
             }
 
-            NavigationLink {
-                RoutineDetailView(mode: .edit(routine.id))
+            Button {
+                workoutSession.begin(from: routine)
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "play.circle.fill")
@@ -272,4 +273,5 @@ private struct QuickActionTile: View {
 #Preview {
     HomeView()
         .environmentObject(RoutineStore())
+        .environmentObject(WorkoutSessionManager())
 }

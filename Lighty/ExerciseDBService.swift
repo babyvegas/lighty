@@ -1,8 +1,8 @@
 import Foundation
 
 struct ExerciseDBConfig {
-    // Replace with your RapidAPI key from ExerciseDB.
-    static let apiKey = "89f1cefde4msh55fa5713ea26680p1eb6c1jsn2a185e47cd03"
+    // Loaded from environment to avoid committing secrets.
+    static let apiKey = ProcessInfo.processInfo.environment["EXERCISEDB_API_KEY"] ?? ""
     static let baseURL = URL(string: "https://exercisedb.p.rapidapi.com")!
     static let host = "exercisedb.p.rapidapi.com"
 }
@@ -23,9 +23,10 @@ final class ExerciseDBService {
     }
 
     func searchExercises(name: String) async throws -> [ExerciseDBExercise] {
+        let normalized = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let url = ExerciseDBConfig.baseURL
             .appendingPathComponent("exercises/name")
-            .appendingPathComponent(name)
+            .appendingPathComponent(normalized)
         return try await request(url: url)
     }
 

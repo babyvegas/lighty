@@ -199,6 +199,7 @@ struct ExerciseRowThumbnail: View {
 final class ExerciseCatalogViewModel: ObservableObject {
     @Published var displayedExercises: [ExerciseCatalogItem] = []
     @Published var popularExercises: [ExerciseCatalogItem] = []
+    @Published private var allExercises: [ExerciseCatalogItem] = []
     @Published var bodyParts: [String] = []
     @Published var equipment: [String] = []
     @Published var isLoading = false
@@ -212,8 +213,11 @@ final class ExerciseCatalogViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         do {
-            let exercises = try await service.fetchAllExercises()
-            popularExercises = exercises.prefix(20).map(mapToCatalogItem)
+            if allExercises.isEmpty {
+                let exercises = try await service.fetchAllExercises()
+                allExercises = exercises.map(mapToCatalogItem)
+            }
+            popularExercises = Array(allExercises.prefix(20))
         } catch {
             popularExercises = []
         }
@@ -228,10 +232,25 @@ final class ExerciseCatalogViewModel: ObservableObject {
         }
 
         currentTask = Task {
+            try? await Task.sleep(for: .milliseconds(250))
+            if Task.isCancelled { return }
             isLoading = true
             defer { isLoading = false }
             do {
-                let exercises = try await service.searchExercises(name: text)
+                let query = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if !allExercises.isEmpty {
+                    let localMatches = allExercises
+                        .filter { $0.name.lowercased().contains(query) }
+                        .prefix(50)
+                    if !localMatches.isEmpty {
+                        displayedExercises = Array(localMatches)
+                        hasActiveFilter = true
+                        return
+                    }
+                }
+
+                // Fallback to API search if local cache is empty or no matches found.
+                let exercises = try await service.searchExercises(name: query)
                 displayedExercises = exercises.map(mapToCatalogItem)
                 hasActiveFilter = true
             } catch {

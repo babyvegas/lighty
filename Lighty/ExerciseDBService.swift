@@ -1,10 +1,54 @@
 import Foundation
 
 struct ExerciseDBConfig {
-    // Loaded from environment to avoid committing secrets.
-    static let apiKey = ProcessInfo.processInfo.environment["EXERCISEDB_API_KEY"] ?? ""
+    static let apiKey = resolveAPIKey()
     static let baseURL = URL(string: "https://exercisedb.p.rapidapi.com")!
     static let host = "exercisedb.p.rapidapi.com"
+
+    private static func resolveAPIKey() -> String {
+        // 1) Preferred: key injected into Info.plist from xcconfig.
+        if let fromBundle = Bundle.main.object(forInfoDictionaryKey: "EXERCISEDB_API_KEY") as? String,
+           !fromBundle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return fromBundle
+        }
+
+        // 2) Optional: scheme environment variable for local debugging.
+        let fromEnv = ProcessInfo.processInfo.environment["EXERCISEDB_API_KEY"] ?? ""
+        if !fromEnv.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return fromEnv
+        }
+
+#if DEBUG
+        // 3) Debug fallback: read from local Config.xcconfig using source path.
+        if let fromXCConfig = readAPIKeyFromLocalXCConfig(),
+           !fromXCConfig.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return fromXCConfig
+        }
+#endif
+        return ""
+    }
+
+#if DEBUG
+    private static func readAPIKeyFromLocalXCConfig() -> String? {
+        let sourceFilePath = URL(fileURLWithPath: #filePath)
+        let projectRoot = sourceFilePath.deletingLastPathComponent().deletingLastPathComponent()
+        let configURL = projectRoot.appendingPathComponent("Config.xcconfig")
+
+        guard let content = try? String(contentsOf: configURL, encoding: .utf8) else {
+            return nil
+        }
+
+        for rawLine in content.components(separatedBy: .newlines) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            guard line.hasPrefix("EXERCISEDB_API_KEY") else { continue }
+            let parts = line.split(separator: "=", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { continue }
+            return parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        return nil
+    }
+#endif
 }
 
 struct ExerciseDBExercise: Decodable {
@@ -60,8 +104,11 @@ final class ExerciseDBService {
         request.setValue(ExerciseDBConfig.host, forHTTPHeaderField: "X-RapidAPI-Host")
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse,
-              200..<300 ~= httpResponse.statusCode else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        guard 200..<300 ~= httpResponse.statusCode else {
             throw URLError(.badServerResponse)
         }
 

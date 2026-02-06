@@ -389,9 +389,15 @@ struct RemoteThumbnailView<Placeholder: View>: View {
             }
 
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse,
-                  200..<300 ~= httpResponse.statusCode,
-                  let uiImage = UIImage(data: data) else {
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return
+            }
+
+            guard 200..<300 ~= httpResponse.statusCode else {
+                return
+            }
+
+            guard let uiImage = UIImage(data: data) else {
                 return
             }
 

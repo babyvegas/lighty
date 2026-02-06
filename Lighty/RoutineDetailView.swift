@@ -89,6 +89,9 @@ struct RoutineDetailView: View {
     private func saveRoutine() {
         // Persist changes back into the shared store.
         store.save(routine)
+        if case .edit = mode {
+            store.recordTraining(from: routine)
+        }
         dismiss()
     }
 }

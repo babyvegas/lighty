@@ -8,6 +8,7 @@ internal import Combine
 final class RoutineStore: ObservableObject {
     @Published private(set) var routines: [Routine] = []
     @Published private(set) var recentExercises: [ExerciseCatalogItem] = []
+    @Published private(set) var completedTrainings: [CompletedTraining] = []
 
     private let container: ModelContainer
     private let context: ModelContext
@@ -20,6 +21,7 @@ final class RoutineStore: ObservableObject {
                 ExerciseEntity.self,
                 WorkoutSetEntity.self,
                 RecentExerciseEntity.self,
+                TrainingSessionEntity.self,
                 configurations: configuration
             )
             self.init(container: container)
@@ -76,6 +78,16 @@ final class RoutineStore: ObservableObject {
         persistRecentExercise(exercise)
     }
 
+    func recordTraining(from routine: Routine, date: Date = .now) {
+        let session = CompletedTraining(
+            date: date,
+            title: routine.name.isEmpty ? "Workout" : routine.name,
+            exerciseCount: routine.exercises.count
+        )
+        completedTrainings.insert(session, at: 0)
+        persistTrainingSession(session)
+    }
+
     // MARK: - Persistence
 
     private func loadFromPersistence() {
@@ -91,9 +103,16 @@ final class RoutineStore: ObservableObject {
             )
             let recentEntities = try context.fetch(recentDescriptor)
             recentExercises = Array(recentEntities.prefix(10)).map(mapRecentExercise)
+
+            let sessionsDescriptor = FetchDescriptor<TrainingSessionEntity>(
+                sortBy: [SortDescriptor(\TrainingSessionEntity.performedAt, order: .reverse)]
+            )
+            let sessions = try context.fetch(sessionsDescriptor)
+            completedTrainings = sessions.map(mapTraining)
         } catch {
             routines = []
             recentExercises = []
+            completedTrainings = []
         }
     }
 
@@ -136,7 +155,7 @@ final class RoutineStore: ObservableObject {
                 imageURLString: exercise.imageURL?.absoluteString,
                 mediaURLString: exercise.mediaURL?.absoluteString,
                 primaryMuscle: exercise.primaryMuscle,
-                secondaryMuscles: exercise.secondaryMuscles,
+                secondaryMusclesCSV: encodeMuscles(exercise.secondaryMuscles),
                 restMinutes: exercise.restMinutes,
                 orderIndex: exerciseIndex,
                 sets: setEntities
@@ -157,7 +176,7 @@ final class RoutineStore: ObservableObject {
             imageURLString: exercise.imageURL?.absoluteString,
             mediaURLString: exercise.mediaURL?.absoluteString,
             primaryMuscle: exercise.primaryMuscle,
-            secondaryMuscles: exercise.secondaryMuscles,
+            secondaryMusclesCSV: encodeMuscles(exercise.secondaryMuscles),
             lastUsedAt: .now
         )
 
@@ -171,10 +190,21 @@ final class RoutineStore: ObservableObject {
         entity.imageURLString = exercise.imageURL?.absoluteString
         entity.mediaURLString = exercise.mediaURL?.absoluteString
         entity.primaryMuscle = exercise.primaryMuscle
-        entity.secondaryMuscles = exercise.secondaryMuscles
+        entity.secondaryMusclesCSV = encodeMuscles(exercise.secondaryMuscles)
         entity.lastUsedAt = .now
 
         trimRecentEntitiesIfNeeded()
+        saveContext()
+    }
+
+    private func persistTrainingSession(_ session: CompletedTraining) {
+        let entity = TrainingSessionEntity(
+            id: session.id,
+            performedAt: session.date,
+            title: session.title,
+            exerciseCount: session.exerciseCount
+        )
+        context.insert(entity)
         saveContext()
     }
 
@@ -247,7 +277,7 @@ final class RoutineStore: ObservableObject {
             imageURL: entity.imageURLString.flatMap(URL.init(string:)),
             mediaURL: entity.mediaURLString.flatMap(URL.init(string:)),
             primaryMuscle: entity.primaryMuscle,
-            secondaryMuscles: entity.secondaryMuscles,
+            secondaryMuscles: decodeMuscles(entity.secondaryMusclesCSV),
             sets: sets,
             restMinutes: entity.restMinutes
         )
@@ -262,7 +292,32 @@ final class RoutineStore: ObservableObject {
             imageURL: entity.imageURLString.flatMap(URL.init(string:)),
             mediaURL: entity.mediaURLString.flatMap(URL.init(string:)),
             primaryMuscle: entity.primaryMuscle,
-            secondaryMuscles: entity.secondaryMuscles
+            secondaryMuscles: decodeMuscles(entity.secondaryMusclesCSV)
         )
+    }
+
+    private func mapTraining(_ entity: TrainingSessionEntity) -> CompletedTraining {
+        CompletedTraining(
+            id: entity.id,
+            date: entity.performedAt,
+            title: entity.title,
+            exerciseCount: entity.exerciseCount
+        )
+    }
+
+    private func encodeMuscles(_ muscles: [String]) -> String {
+        muscles
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "|")
+    }
+
+    private func decodeMuscles(_ csv: String?) -> [String] {
+        guard let csv else { return [] }
+        return csv
+            .split(separator: "|")
+            .map(String.init)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
     }
 }

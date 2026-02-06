@@ -11,7 +11,8 @@ struct LightyApp: App {
                 for: RoutineEntity.self,
                 ExerciseEntity.self,
                 WorkoutSetEntity.self,
-                RecentExerciseEntity.self
+                RecentExerciseEntity.self,
+                TrainingSessionEntity.self
             )
             _store = StateObject(wrappedValue: RoutineStore(container: container))
         } catch {

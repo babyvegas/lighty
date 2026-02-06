@@ -26,7 +26,7 @@ final class ExerciseEntity {
     var imageURLString: String?
     var mediaURLString: String?
     var primaryMuscle: String
-    var secondaryMuscles: [String]
+    var secondaryMusclesCSV: String?
     var restMinutes: Double
     var orderIndex: Int
     @Relationship(deleteRule: .cascade) var sets: [WorkoutSetEntity]
@@ -38,7 +38,7 @@ final class ExerciseEntity {
         imageURLString: String?,
         mediaURLString: String?,
         primaryMuscle: String,
-        secondaryMuscles: [String],
+        secondaryMusclesCSV: String?,
         restMinutes: Double,
         orderIndex: Int,
         sets: [WorkoutSetEntity] = []
@@ -49,7 +49,7 @@ final class ExerciseEntity {
         self.imageURLString = imageURLString
         self.mediaURLString = mediaURLString
         self.primaryMuscle = primaryMuscle
-        self.secondaryMuscles = secondaryMuscles
+        self.secondaryMusclesCSV = secondaryMusclesCSV
         self.restMinutes = restMinutes
         self.orderIndex = orderIndex
         self.sets = sets
@@ -80,7 +80,7 @@ final class RecentExerciseEntity {
     var imageURLString: String?
     var mediaURLString: String?
     var primaryMuscle: String
-    var secondaryMuscles: [String]
+    var secondaryMusclesCSV: String?
     var lastUsedAt: Date
 
     init(
@@ -91,7 +91,7 @@ final class RecentExerciseEntity {
         imageURLString: String?,
         mediaURLString: String?,
         primaryMuscle: String,
-        secondaryMuscles: [String],
+        secondaryMusclesCSV: String?,
         lastUsedAt: Date = .now
     ) {
         self.id = id
@@ -101,7 +101,22 @@ final class RecentExerciseEntity {
         self.imageURLString = imageURLString
         self.mediaURLString = mediaURLString
         self.primaryMuscle = primaryMuscle
-        self.secondaryMuscles = secondaryMuscles
+        self.secondaryMusclesCSV = secondaryMusclesCSV
         self.lastUsedAt = lastUsedAt
+    }
+}
+
+@Model
+final class TrainingSessionEntity {
+    var id: UUID
+    var performedAt: Date
+    var title: String
+    var exerciseCount: Int
+
+    init(id: UUID, performedAt: Date, title: String, exerciseCount: Int) {
+        self.id = id
+        self.performedAt = performedAt
+        self.title = title
+        self.exerciseCount = exerciseCount
     }
 }

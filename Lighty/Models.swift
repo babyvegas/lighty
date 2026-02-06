@@ -78,3 +78,17 @@ struct ExerciseCatalogItem: Identifiable, Hashable {
     var primaryMuscle: String
     var secondaryMuscles: [String]
 }
+
+struct CompletedTraining: Identifiable, Hashable {
+    let id: UUID
+    var date: Date
+    var title: String
+    var exerciseCount: Int
+
+    init(id: UUID = UUID(), date: Date = .now, title: String, exerciseCount: Int) {
+        self.id = id
+        self.date = date
+        self.title = title
+        self.exerciseCount = exerciseCount
+    }
+}

@@ -17,9 +17,17 @@ struct RoutineDetailView: View {
     var body: some View {
         List {
             Section {
-                TextField("Routine Name", text: $routine.name)
-            } header: {
-                Text("Details")
+                VStack(alignment: .leading, spacing: 10) {
+                    TextField("", text: $routine.name, prompt: Text("New Routine"))
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .textFieldStyle(.plain)
+
+                    TextField("Routine description", text: $routine.description, axis: .vertical)
+                        .lineLimit(3, reservesSpace: true)
+                        .textFieldStyle(.plain)
+                }
+                .padding(.vertical, 4)
             }
 
             Section {
@@ -30,12 +38,13 @@ struct RoutineDetailView: View {
 
                 ForEach($routine.exercises) { $exercise in
                     ExerciseEditorView(exercise: $exercise)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 8)
                 }
 
                 Button("Add Exercise") {
                     showExercisePicker = true
                 }
+                .padding(.vertical, 6)
             } header: {
                 Text("Exercises")
             }
@@ -79,9 +88,13 @@ private struct ExerciseEditorView: View {
     @State private var showRestPicker = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Text(exercise.name)
                 .font(.headline)
+
+            TextField("Write your notes here", text: $exercise.notes, axis: .vertical)
+                .lineLimit(3, reservesSpace: true)
+                .textFieldStyle(.plain)
 
             setHeaderRow
 
@@ -92,12 +105,12 @@ private struct ExerciseEditorView: View {
 
                     TextField("0", value: $exercise.sets[index].weight, format: .number)
                         .keyboardType(.numberPad)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
                         .frame(width: 110)
 
                     TextField("0", value: $exercise.sets[index].reps, format: .number)
                         .keyboardType(.numberPad)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
                         .frame(width: 80)
                 }
             }
@@ -106,10 +119,17 @@ private struct ExerciseEditorView: View {
                 showRestPicker = true
             }
             .font(.subheadline)
+            .padding(.vertical, 6)
+            .buttonStyle(.borderless)
+
+            Spacer()
+                .frame(height: 6)
 
             Button("Add Set") {
                 exercise.sets.append(WorkoutSet())
             }
+            .padding(.vertical, 4)
+            .buttonStyle(.borderless)
         }
         .sheet(isPresented: $showRestPicker) {
             RestPickerView(restMinutes: $exercise.restMinutes)
@@ -117,7 +137,11 @@ private struct ExerciseEditorView: View {
     }
 
     private var restLabel: String {
-        exercise.restMinutes == 0 ? "Rest: OFF" : "Rest: \(exercise.restMinutes) min"
+        guard exercise.restMinutes > 0 else { return "Rest: OFF" }
+        let wholeMinutes = Int(exercise.restMinutes)
+        let hasHalf = exercise.restMinutes.truncatingRemainder(dividingBy: 1) != 0
+        let label = hasHalf ? "\(wholeMinutes).30" : "\(wholeMinutes)"
+        return "Rest: \(label) min"
     }
 
     private var setHeaderRow: some View {
@@ -141,15 +165,17 @@ private struct ExerciseEditorView: View {
 }
 
 private struct RestPickerView: View {
-    @Binding var restMinutes: Int
+    @Binding var restMinutes: Double
     @Environment(\.dismiss) private var dismiss
+
+    private let restOptions = stride(from: 0.0, through: 5.0, by: 0.5).map { $0 }
 
     var body: some View {
         NavigationStack {
             Form {
                 Picker("Rest Timer", selection: $restMinutes) {
-                    ForEach(0...5, id: \.self) { minutes in
-                        Text(minutes == 0 ? "OFF" : "\(minutes) min")
+                    ForEach(restOptions, id: \.self) { minutes in
+                        Text(restLabel(for: minutes))
                             .tag(minutes)
                     }
                 }
@@ -164,6 +190,13 @@ private struct RestPickerView: View {
                 }
             }
         }
+    }
+
+    private func restLabel(for minutes: Double) -> String {
+        if minutes == 0 { return "OFF" }
+        let wholeMinutes = Int(minutes)
+        let hasHalf = minutes.truncatingRemainder(dividingBy: 1) != 0
+        return hasHalf ? "\(wholeMinutes).30 min" : "\(wholeMinutes) min"
     }
 }
 

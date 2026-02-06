@@ -17,13 +17,21 @@ struct WorkoutSet: Identifiable, Hashable {
 struct ExerciseEntry: Identifiable, Hashable {
     let id: UUID
     var name: String
+    var notes: String
     var sets: [WorkoutSet]
-    /// 0 means rest timer is off.
-    var restMinutes: Int
+    /// 0 means rest timer is off. Values are in minutes, with 0.5 increments.
+    var restMinutes: Double
 
-    init(id: UUID = UUID(), name: String, sets: [WorkoutSet] = [WorkoutSet(), WorkoutSet()], restMinutes: Int = 0) {
+    init(
+        id: UUID = UUID(),
+        name: String,
+        notes: String = "",
+        sets: [WorkoutSet] = [WorkoutSet(), WorkoutSet()],
+        restMinutes: Double = 0
+    ) {
         self.id = id
         self.name = name
+        self.notes = notes
         self.sets = sets
         self.restMinutes = restMinutes
     }
@@ -32,11 +40,18 @@ struct ExerciseEntry: Identifiable, Hashable {
 struct Routine: Identifiable, Hashable {
     let id: UUID
     var name: String
+    var description: String
     var exercises: [ExerciseEntry]
 
-    init(id: UUID = UUID(), name: String = "New Routine", exercises: [ExerciseEntry] = []) {
+    init(
+        id: UUID = UUID(),
+        name: String = "New Routine",
+        description: String = "",
+        exercises: [ExerciseEntry] = []
+    ) {
         self.id = id
         self.name = name
+        self.description = description
         self.exercises = exercises
     }
 }

@@ -4,10 +4,10 @@ import Foundation
 
 struct WorkoutSet: Identifiable, Hashable {
     let id: UUID
-    var weight: Int
+    var weight: Double
     var reps: Int
 
-    init(id: UUID = UUID(), weight: Int = 0, reps: Int = 0) {
+    init(id: UUID = UUID(), weight: Double = 0, reps: Int = 0) {
         self.id = id
         self.weight = weight
         self.reps = reps

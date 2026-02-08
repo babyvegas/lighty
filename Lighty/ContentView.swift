@@ -9,4 +9,5 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environmentObject(RoutineStore())
+        .environmentObject(PhoneWatchConnectivityCoordinator())
 }

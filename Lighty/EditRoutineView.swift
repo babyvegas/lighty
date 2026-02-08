@@ -10,7 +10,6 @@ struct EditRoutineView: View {
     @State private var showExercisePicker = false
     @State private var showReorderSheet = false
     @State private var exerciseToReplace: ExerciseEntry.ID?
-    @State private var showRestPicker = false
     @State private var restExerciseID: ExerciseEntry.ID?
     @State private var selectedExerciseID: ExerciseEntry.ID?
 
@@ -75,7 +74,6 @@ struct EditRoutineView: View {
 
                             Button(restLabel(for: exercise)) {
                                 restExerciseID = exercise.id
-                                showRestPicker = true
                             }
                             .buttonStyle(.plain)
                             .foregroundStyle(StyleKit.accentBlue)
@@ -89,8 +87,12 @@ struct EditRoutineView: View {
                                         .frame(width: 30, alignment: .leading)
                                         .foregroundStyle(StyleKit.softInk)
 
-                                    TextField("0", value: $exercise.sets[index].weight, format: .number)
-                                        .keyboardType(.numberPad)
+                                    TextField(
+                                        "0",
+                                        value: $exercise.sets[index].weight,
+                                        format: .number.precision(.fractionLength(0...1))
+                                    )
+                                        .keyboardType(.decimalPad)
                                         .textFieldStyle(.plain)
                                         .frame(width: 110)
 
@@ -170,7 +172,12 @@ struct EditRoutineView: View {
         .sheet(isPresented: $showReorderSheet) {
             ReorderExercisesView(exercises: $routine.exercises)
         }
-        .sheet(isPresented: $showRestPicker) {
+        .sheet(
+            isPresented: Binding(
+                get: { restExerciseID != nil },
+                set: { if !$0 { restExerciseID = nil } }
+            )
+        ) {
             if let binding = restBinding() {
                 RestPickerView(restMinutes: binding)
             }

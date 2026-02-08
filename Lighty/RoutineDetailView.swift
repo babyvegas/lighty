@@ -156,8 +156,12 @@ private struct ExerciseEditorView: View {
                         .frame(width: 30, alignment: .leading)
                         .foregroundStyle(StyleKit.softInk)
 
-                    TextField("0", value: $exercise.sets[index].weight, format: .number)
-                        .keyboardType(.numberPad)
+                    TextField(
+                        "0",
+                        value: $exercise.sets[index].weight,
+                        format: .number.precision(.fractionLength(0...1))
+                    )
+                        .keyboardType(.decimalPad)
                         .textFieldStyle(.plain)
                         .frame(width: 110)
 
@@ -239,13 +243,8 @@ struct RestPickerView: View {
             .navigationTitle("Rest Timer")
             .scrollContentBackground(.hidden)
             .background(AppBackgroundLayer())
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .foregroundStyle(StyleKit.accentBlue)
-                }
+            .onChange(of: restMinutes) { _, _ in
+                dismiss()
             }
         }
     }

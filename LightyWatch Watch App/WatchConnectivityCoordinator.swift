@@ -115,6 +115,54 @@ final class WatchConnectivityCoordinator: NSObject, ObservableObject {
         }
     }
 
+    func sendSetAdded(sessionId: String, exerciseId: String, setId: String) {
+        guard let session else { return }
+
+        let payload: [String: Any] = [
+            "type": "set_added",
+            "origin": "watch",
+            "sessionId": sessionId,
+            "exerciseId": exerciseId,
+            "setId": setId,
+            "sentAt": Date().timeIntervalSince1970
+        ]
+
+        if session.isReachable {
+            session.sendMessage(payload, replyHandler: nil) { [weak self] error in
+                Task { @MainActor in
+                    self?.lastEventDescription = "Set add failed: \(error.localizedDescription)"
+                }
+            }
+        } else {
+            session.transferUserInfo(payload)
+            lastEventDescription = "Set add queued"
+        }
+    }
+
+    func sendSetDeleted(sessionId: String, exerciseId: String, setId: String) {
+        guard let session else { return }
+
+        let payload: [String: Any] = [
+            "type": "set_deleted",
+            "origin": "watch",
+            "sessionId": sessionId,
+            "exerciseId": exerciseId,
+            "setId": setId,
+            "sentAt": Date().timeIntervalSince1970
+        ]
+
+        if session.isReachable {
+            session.sendMessage(payload, replyHandler: nil) { [weak self] error in
+                Task { @MainActor in
+                    self?.lastEventDescription = "Set delete failed: \(error.localizedDescription)"
+                }
+            }
+        } else {
+            session.transferUserInfo(payload)
+            lastEventDescription = "Set delete queued"
+        }
+    }
+
     func sendRestAdjustment(sessionId: String, exerciseId: String, remainingSeconds: Int, exerciseName: String) {
         guard let session else { return }
 

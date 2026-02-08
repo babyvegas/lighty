@@ -261,6 +261,26 @@ extension PhoneWatchConnectivityCoordinator: WCSessionDelegate {
             return
         }
 
+        if type == "set_added" {
+            NotificationCenter.default.post(
+                name: .watchSetAdded,
+                object: nil,
+                userInfo: payload
+            )
+            lastEventDescription = "Set added from watch"
+            return
+        }
+
+        if type == "set_deleted" {
+            NotificationCenter.default.post(
+                name: .watchSetDeleted,
+                object: nil,
+                userInfo: payload
+            )
+            lastEventDescription = "Set deleted from watch"
+            return
+        }
+
         if type == "rest_adjusted" {
             NotificationCenter.default.post(
                 name: .watchRestAdjusted,
@@ -290,4 +310,6 @@ extension Notification.Name {
     static let watchSetUpdated = Notification.Name("lighty.watchSetUpdated")
     static let watchRestAdjusted = Notification.Name("lighty.watchRestAdjusted")
     static let watchSessionFinished = Notification.Name("lighty.watchSessionFinished")
+    static let watchSetAdded = Notification.Name("lighty.watchSetAdded")
+    static let watchSetDeleted = Notification.Name("lighty.watchSetDeleted")
 }

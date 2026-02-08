@@ -385,6 +385,27 @@ final class WorkoutSessionManager: ObservableObject {
         exercises = updated
     }
 
+    func applyRemoteSetAdded(exerciseId: UUID, setId: UUID) {
+        guard let exerciseIndex = exercises.firstIndex(where: { $0.id == exerciseId }) else {
+            return
+        }
+
+        var updated = exercises
+        let newSet = WorkoutSessionSet(id: setId)
+        updated[exerciseIndex].sets.append(newSet)
+        exercises = updated
+    }
+
+    func applyRemoteSetDeleted(exerciseId: UUID, setId: UUID) {
+        guard let exerciseIndex = exercises.firstIndex(where: { $0.id == exerciseId }) else {
+            return
+        }
+
+        var updated = exercises
+        updated[exerciseIndex].sets.removeAll { $0.id == setId }
+        exercises = updated
+    }
+
     func applyRemoteRestAdjustment(remainingSeconds: Int, exerciseName: String?, exerciseId: UUID?) {
         guard remainingSeconds > 0 else {
             skipRest()
@@ -673,6 +694,28 @@ struct WorkoutSessionView: View {
                 weight: weight,
                 reps: reps
             )
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .watchSetAdded)) { notification in
+            guard let userInfo = notification.userInfo,
+                  let exerciseIdString = userInfo["exerciseId"] as? String,
+                  let setIdString = userInfo["setId"] as? String,
+                  let exerciseId = UUID(uuidString: exerciseIdString),
+                  let setId = UUID(uuidString: setIdString) else {
+                return
+            }
+            workoutSession.applyRemoteSetAdded(exerciseId: exerciseId, setId: setId)
+            syncSessionSnapshot()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .watchSetDeleted)) { notification in
+            guard let userInfo = notification.userInfo,
+                  let exerciseIdString = userInfo["exerciseId"] as? String,
+                  let setIdString = userInfo["setId"] as? String,
+                  let exerciseId = UUID(uuidString: exerciseIdString),
+                  let setId = UUID(uuidString: setIdString) else {
+                return
+            }
+            workoutSession.applyRemoteSetDeleted(exerciseId: exerciseId, setId: setId)
+            syncSessionSnapshot()
         }
         .onReceive(NotificationCenter.default.publisher(for: .watchRestAdjusted)) { notification in
             guard let userInfo = notification.userInfo,

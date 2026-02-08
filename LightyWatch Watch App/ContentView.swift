@@ -16,16 +16,20 @@ struct ContentView: View {
     @State private var restExerciseName = ""
     @State private var restExerciseId: String?
 
+    @State private var currentExerciseIndex = 0
+    @State private var currentSetIndex = 0
+
     var body: some View {
         Group {
             if session.exercises.isEmpty {
                 emptyState
             } else {
-                workoutList
+                activeWorkoutView
             }
         }
         .onReceive(connectivity.$lastSessionPayload.compactMap { $0 }) { payload in
             session.applySnapshot(payload)
+            normalizeIndices()
         }
         .onReceive(connectivity.$lastRestPayload.compactMap { $0 }) { payload in
             guard let seconds = payload["remainingSeconds"] as? Int else { return }
@@ -71,9 +75,9 @@ struct ContentView: View {
         }
     }
 
-    private var workoutList: some View {
-        List {
-            Section {
+    private var activeWorkoutView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 6) {
                     Circle()
                         .fill(syncColor)
@@ -82,67 +86,66 @@ struct ContentView: View {
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(syncColor)
                 }
-            }
 
-            Section {
-                Text(session.title)
-                    .font(.headline)
-            }
+                if let exercise = currentExercise,
+                   let setBinding = currentSetBinding {
+                    Text(exercise.name)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
 
-            ForEach(session.exercises.indices, id: \.self) { exerciseIndex in
-                let exercise = session.exercises[exerciseIndex]
-                Section {
-                    ForEach(session.exercises[exerciseIndex].sets.indices, id: \.self) { setIndex in
-                        WatchSetRow(
-                            exerciseId: exercise.id,
-                            setId: session.exercises[exerciseIndex].sets[setIndex].id,
-                            setIndexLabel: setIndex + 1,
-                            set: $session.exercises[exerciseIndex].sets[setIndex],
-                            onToggle: { isCompleted in
-                                if !session.sessionId.isEmpty {
-                                    connectivity.sendSetToggle(
-                                        sessionId: session.sessionId,
-                                        exerciseId: exercise.id,
-                                        setId: session.exercises[exerciseIndex].sets[setIndex].id,
-                                        isCompleted: isCompleted
-                                    )
-                                }
-                                if isCompleted {
-                                    beginRest(for: exercise)
-                                }
-                            },
-                            onSendUpdate: { weight, reps in
-                                guard !session.sessionId.isEmpty else { return }
-                                connectivity.sendSetUpdate(
+                    Text("Serie actual")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    Text("Serie \(currentSetIndex + 1) / \(exercise.sets.count)")
+                        .font(.title3.weight(.semibold))
+
+                    WatchActiveSetView(
+                        exerciseId: exercise.id,
+                        setId: exercise.sets[currentSetIndex].id,
+                        set: setBinding,
+                        previousLabel: previousLabel(for: exercise.sets[currentSetIndex]),
+                        onSendUpdate: { weight, reps in
+                            guard !session.sessionId.isEmpty else { return }
+                            connectivity.sendSetUpdate(
+                                sessionId: session.sessionId,
+                                exerciseId: exercise.id,
+                                setId: exercise.sets[currentSetIndex].id,
+                                weight: weight,
+                                reps: reps
+                            )
+                        },
+                        onComplete: { isCompleted in
+                            if !session.sessionId.isEmpty {
+                                connectivity.sendSetToggle(
                                     sessionId: session.sessionId,
                                     exerciseId: exercise.id,
-                                    setId: session.exercises[exerciseIndex].sets[setIndex].id,
-                                    weight: weight,
-                                    reps: reps
+                                    setId: exercise.sets[currentSetIndex].id,
+                                    isCompleted: isCompleted
                                 )
                             }
-                        )
-                    }
-                } header: {
-                    Text(exercise.name)
-                        .font(.caption.bold())
-                }
-            }
+                            if isCompleted {
+                                beginRest(for: exercise)
+                            }
+                        },
+                        onPrev: { goToPreviousSet() },
+                        onNext: { goToNextSet() },
+                        onAddSet: { addSet(in: exercise) },
+                        onDeleteSet: { deleteSet(in: exercise) },
+                        canDelete: exercise.sets.count > 1
+                    )
 
-            Section {
-                Button {
-                    finishWorkout()
-                } label: {
-                    HStack {
-                        Spacer()
-                        Text("Finish Workout")
-                            .font(.headline)
-                        Spacer()
+                    Button("Finalizar entrenamiento") {
+                        finishWorkout()
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.blue)
                 }
             }
+            .padding(.horizontal, 8)
+            .padding(.top, 6)
         }
-        .listStyle(.carousel)
     }
 
     private var emptyState: some View {
@@ -154,6 +157,94 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
         }
         .padding()
+    }
+
+    private var currentExercise: WatchWorkoutExercise? {
+        guard session.exercises.indices.contains(currentExerciseIndex) else { return nil }
+        return session.exercises[currentExerciseIndex]
+    }
+
+    private var currentSetBinding: Binding<WatchWorkoutSet>? {
+        guard session.exercises.indices.contains(currentExerciseIndex),
+              session.exercises[currentExerciseIndex].sets.indices.contains(currentSetIndex) else {
+            return nil
+        }
+        return $session.exercises[currentExerciseIndex].sets[currentSetIndex]
+    }
+
+    private func normalizeIndices() {
+        if session.exercises.isEmpty {
+            currentExerciseIndex = 0
+            currentSetIndex = 0
+            return
+        }
+        if currentExerciseIndex >= session.exercises.count {
+            currentExerciseIndex = max(session.exercises.count - 1, 0)
+        }
+        let setsCount = session.exercises[currentExerciseIndex].sets.count
+        if setsCount == 0 {
+            currentSetIndex = 0
+        } else if currentSetIndex >= setsCount {
+            currentSetIndex = max(setsCount - 1, 0)
+        }
+    }
+
+    private func goToNextSet() {
+        guard let exercise = currentExercise else { return }
+        if currentSetIndex + 1 < exercise.sets.count {
+            currentSetIndex += 1
+            return
+        }
+        if currentExerciseIndex + 1 < session.exercises.count {
+            currentExerciseIndex += 1
+            currentSetIndex = 0
+        }
+    }
+
+    private func goToPreviousSet() {
+        if currentSetIndex > 0 {
+            currentSetIndex -= 1
+            return
+        }
+        if currentExerciseIndex > 0 {
+            currentExerciseIndex -= 1
+            let setsCount = session.exercises[currentExerciseIndex].sets.count
+            currentSetIndex = max(setsCount - 1, 0)
+        }
+    }
+
+    private func addSet(in exercise: WatchWorkoutExercise) {
+        guard !session.sessionId.isEmpty else { return }
+        let newSetId = UUID().uuidString
+        session.addSet(exerciseId: exercise.id, newSetId: newSetId)
+        connectivity.sendSetAdded(
+            sessionId: session.sessionId,
+            exerciseId: exercise.id,
+            setId: newSetId
+        )
+        normalizeIndices()
+        if let setsCount = currentExercise?.sets.count {
+            currentSetIndex = max(setsCount - 1, 0)
+        }
+    }
+
+    private func deleteSet(in exercise: WatchWorkoutExercise) {
+        guard exercise.sets.count > 1 else { return }
+        guard !session.sessionId.isEmpty else { return }
+        let setId = exercise.sets[currentSetIndex].id
+        session.deleteSet(exerciseId: exercise.id, setId: setId)
+        connectivity.sendSetDeleted(
+            sessionId: session.sessionId,
+            exerciseId: exercise.id,
+            setId: setId
+        )
+        normalizeIndices()
+    }
+
+    private func previousLabel(for set: WatchWorkoutSet) -> String {
+        guard set.lastWeight > 0 || set.lastReps > 0 else { return "Anterior: -" }
+        let weightLabel = formatWeight(set.lastWeight)
+        return "Anterior: \(weightLabel) lb x \(set.lastReps)"
     }
 
     private func beginRest(for exercise: WatchWorkoutExercise) {
@@ -213,50 +304,48 @@ struct ContentView: View {
         let isLive = connectivity.isReachable && connectivity.isCompanionAppInstalled
         return isLive ? .green : Color.gray.opacity(0.7)
     }
+
+    private func formatWeight(_ value: Double) -> String {
+        if value.truncatingRemainder(dividingBy: 1) == 0 {
+            return "\(Int(value))"
+        }
+        return String(format: "%.1f", value)
+    }
 }
 
 private enum CrownField: Hashable {
-    case weight(exerciseId: String, setId: String)
-    case reps(exerciseId: String, setId: String)
+    case weight
+    case reps
 }
 
-private struct WatchSetRow: View {
+private struct WatchActiveSetView: View {
     let exerciseId: String
     let setId: String
-    let setIndexLabel: Int
-
     @Binding var set: WatchWorkoutSet
-    @FocusState private var focusedField: CrownField?
-    let onToggle: (Bool) -> Void
-    let onSendUpdate: (Double, Int) -> Void
+    let previousLabel: String
 
-    @State private var pendingUpdateTask: Task<Void, Never>?
+    let onSendUpdate: (Double, Int) -> Void
+    let onComplete: (Bool) -> Void
+    let onPrev: () -> Void
+    let onNext: () -> Void
+    let onAddSet: () -> Void
+    let onDeleteSet: () -> Void
+    let canDelete: Bool
+
+    @FocusState private var focusedField: CrownField?
     @State private var crownWeight: Double = 0
     @State private var crownReps: Double = 0
+    @State private var pendingUpdateTask: Task<Void, Never>?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Set \(setIndexLabel)")
-                    .font(.caption2.weight(.semibold))
-                Spacer()
-                Button {
-                    set.isCompleted.toggle()
-                    onToggle(set.isCompleted)
-                } label: {
-                    Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(set.isCompleted ? Color.green : Color.gray)
-                }
-                .buttonStyle(.plain)
-            }
-
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 crownControl(
                     title: "LBS",
                     value: formatWeight(set.weight),
-                    isFocused: focusedField == .weight(exerciseId: exerciseId, setId: setId)
+                    isFocused: focusedField == .weight
                 ) {
-                    focusedField = .weight(exerciseId: exerciseId, setId: setId)
+                    focusedField = .weight
                 }
                 .digitalCrownRotation(
                     $crownWeight,
@@ -268,7 +357,7 @@ private struct WatchSetRow: View {
                     isHapticFeedbackEnabled: true
                 )
                 .focusable(true)
-                .focused($focusedField, equals: .weight(exerciseId: exerciseId, setId: setId))
+                .focused($focusedField, equals: .weight)
                 .onChange(of: crownWeight) { _, newValue in
                     let rounded = round(newValue * 2) / 2
                     if set.weight != rounded {
@@ -280,9 +369,9 @@ private struct WatchSetRow: View {
                 crownControl(
                     title: "REPS",
                     value: "\(set.reps)",
-                    isFocused: focusedField == .reps(exerciseId: exerciseId, setId: setId)
+                    isFocused: focusedField == .reps
                 ) {
-                    focusedField = .reps(exerciseId: exerciseId, setId: setId)
+                    focusedField = .reps
                 }
                 .digitalCrownRotation(
                     $crownReps,
@@ -294,7 +383,7 @@ private struct WatchSetRow: View {
                     isHapticFeedbackEnabled: true
                 )
                 .focusable(true)
-                .focused($focusedField, equals: .reps(exerciseId: exerciseId, setId: setId))
+                .focused($focusedField, equals: .reps)
                 .onChange(of: crownReps) { _, newValue in
                     let reps = max(Int(newValue.rounded()), 0)
                     if set.reps != reps {
@@ -303,19 +392,72 @@ private struct WatchSetRow: View {
                     }
                 }
             }
+
+            Text(previousLabel)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                Button {
+                    onPrev()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    set.isCompleted.toggle()
+                    onComplete(set.isCompleted)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark")
+                        Text("Completar")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+
+                Button {
+                    onNext()
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.bordered)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Opciones de la serie")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Button("Añadir serie") {
+                    onAddSet()
+                }
+                .buttonStyle(.bordered)
+
+                Button("Eliminar serie") {
+                    onDeleteSet()
+                }
+                .buttonStyle(.bordered)
+                .tint(.red)
+                .disabled(!canDelete)
+            }
+            .padding(.top, 6)
         }
-        .padding(.vertical, 4)
         .onAppear {
             crownWeight = set.weight
             crownReps = Double(set.reps)
         }
         .onChange(of: set.weight) { _, newValue in
-            if focusedField != .weight(exerciseId: exerciseId, setId: setId) {
+            if focusedField != .weight {
                 crownWeight = newValue
             }
         }
         .onChange(of: set.reps) { _, newValue in
-            if focusedField != .reps(exerciseId: exerciseId, setId: setId) {
+            if focusedField != .reps {
                 crownReps = Double(newValue)
             }
         }

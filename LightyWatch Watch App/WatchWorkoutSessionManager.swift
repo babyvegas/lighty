@@ -6,6 +6,8 @@ struct WatchWorkoutSet: Identifiable, Hashable {
     let id: String
     var weight: Double
     var reps: Int
+    var lastWeight: Double
+    var lastReps: Int
     var isCompleted: Bool
 }
 
@@ -48,8 +50,21 @@ final class WatchWorkoutSessionManager: ObservableObject {
                     return 0
                 }()
                 let reps = setDict["reps"] as? Int ?? 0
+                let lastWeight: Double = {
+                    if let value = setDict["lastWeight"] as? Double { return value }
+                    if let value = setDict["lastWeight"] as? Int { return Double(value) }
+                    return 0
+                }()
+                let lastReps = setDict["lastReps"] as? Int ?? 0
                 let isCompleted = setDict["isCompleted"] as? Bool ?? false
-                return WatchWorkoutSet(id: setId, weight: weight, reps: reps, isCompleted: isCompleted)
+                return WatchWorkoutSet(
+                    id: setId,
+                    weight: weight,
+                    reps: reps,
+                    lastWeight: lastWeight,
+                    lastReps: lastReps,
+                    isCompleted: isCompleted
+                )
             }
 
             return WatchWorkoutExercise(id: id, name: name, restMinutes: restMinutes, sets: sets)
@@ -73,6 +88,24 @@ final class WatchWorkoutSessionManager: ObservableObject {
         }
         exercises[exerciseIndex].sets[setIndex].weight = weight
         exercises[exerciseIndex].sets[setIndex].reps = reps
+    }
+
+    func addSet(exerciseId: String, newSetId: String) {
+        guard let exerciseIndex = exercises.firstIndex(where: { $0.id == exerciseId }) else { return }
+        let newSet = WatchWorkoutSet(
+            id: newSetId,
+            weight: 0,
+            reps: 0,
+            lastWeight: 0,
+            lastReps: 0,
+            isCompleted: false
+        )
+        exercises[exerciseIndex].sets.append(newSet)
+    }
+
+    func deleteSet(exerciseId: String, setId: String) {
+        guard let exerciseIndex = exercises.firstIndex(where: { $0.id == exerciseId }) else { return }
+        exercises[exerciseIndex].sets.removeAll { $0.id == setId }
     }
 
     func reset() {

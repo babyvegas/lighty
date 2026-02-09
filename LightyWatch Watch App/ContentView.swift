@@ -15,6 +15,7 @@ struct ContentView: View {
     @State private var restRemainingSeconds: Int?
     @State private var restExerciseName = ""
     @State private var restExerciseId: String?
+    @State private var shouldAdvanceAfterRest = false
 
     @State private var currentExerciseIndex = 0
     @State private var currentSetIndex = 0
@@ -94,20 +95,30 @@ struct ContentView: View {
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(syncColor)
                 }
+                .padding(.horizontal, 6)
 
                 if let exercise = currentExercise,
                    let setBinding = currentSetBinding {
-                    Text(exercise.name)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(exercise.name)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                            .lineLimit(2)
 
-                    Text("Serie actual")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-
-                    Text("Serie \(currentSetIndex + 1) / \(exercise.sets.count)")
-                        .font(.title3.weight(.semibold))
+                        HStack(spacing: 8) {
+                            Text("Serie actual")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            Text("Serie \(currentSetIndex + 1) / \(exercise.sets.count)")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.blue)
+                        }
+                    }
+                    .padding(8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color.gray.opacity(0.12))
+                    )
 
                     WatchActiveSetView(
                         exerciseId: exercise.id,
@@ -134,7 +145,7 @@ struct ContentView: View {
                                 )
                             }
                             if isCompleted {
-                                beginRest(for: exercise)
+                                handleSetCompletion(for: exercise)
                             }
                         },
                         onPrev: { goToPreviousSet() },
@@ -143,18 +154,25 @@ struct ContentView: View {
                         onDeleteSet: { deleteSet(in: exercise) },
                         canDelete: exercise.sets.count > 1
                     )
+                    .padding(8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.white.opacity(0.06))
+                    )
 
-                    Button("Finalizar entrenamiento") {
-                        finishWorkout()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.blue)
+                    HStack(spacing: 8) {
+                        Button("Finalizar") {
+                            finishWorkout()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.blue)
 
-                    Button("Descartar entrenamiento") {
-                        discardWorkout()
+                        Button("Descartar") {
+                            discardWorkout()
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.red)
                     }
-                    .buttonStyle(.bordered)
-                    .tint(.red)
                 }
             }
             .padding(.horizontal, 8)
@@ -269,6 +287,17 @@ struct ContentView: View {
         restRemainingSeconds = seconds
     }
 
+    private func handleSetCompletion(for exercise: WatchWorkoutExercise) {
+        let seconds = Int((exercise.restMinutes * 60).rounded())
+        if seconds > 0 {
+            shouldAdvanceAfterRest = true
+            beginRest(for: exercise)
+        } else {
+            shouldAdvanceAfterRest = false
+            goToNextSet()
+        }
+    }
+
     private func adjustRest(by delta: Int) {
         guard let current = restRemainingSeconds else { return }
         let updated = max(current + delta, 0)
@@ -285,6 +314,10 @@ struct ContentView: View {
         let exerciseId = restExerciseId
         restRemainingSeconds = nil
         restExerciseName = ""
+        if shouldAdvanceAfterRest {
+            shouldAdvanceAfterRest = false
+            goToNextSet()
+        }
         if hadRest {
             sendRestAdjustment(seconds: 0, exerciseId: exerciseId)
         }

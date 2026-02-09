@@ -358,9 +358,9 @@ private struct WatchActiveSetView: View {
     let onDeleteSet: () -> Void
     let canDelete: Bool
 
-    @FocusState private var focusedField: CrownField?
-    @State private var crownWeight: Double = 0
-    @State private var crownReps: Double = 0
+    @FocusState private var crownFocused: Bool
+    @State private var selectedField: CrownField = .weight
+    @State private var crownValue: Double = 0
     @State private var pendingUpdateTask: Task<Void, Never>?
 
     var body: some View {
@@ -369,53 +369,21 @@ private struct WatchActiveSetView: View {
                 crownControl(
                     title: "LBS",
                     value: formatWeight(set.weight),
-                    isFocused: focusedField == .weight
+                    isFocused: selectedField == .weight
                 ) {
-                    focusedField = .weight
-                }
-                .digitalCrownRotation(
-                    $crownWeight,
-                    from: 0,
-                    through: 1000,
-                    by: 0.5,
-                    sensitivity: .medium,
-                    isContinuous: true,
-                    isHapticFeedbackEnabled: true
-                )
-                .focusable(true)
-                .focused($focusedField, equals: .weight)
-                .onChange(of: crownWeight) { _, newValue in
-                    let rounded = round(newValue * 2) / 2
-                    if set.weight != rounded {
-                        set.weight = rounded
-                        scheduleUpdate()
-                    }
+                    selectedField = .weight
+                    crownFocused = true
+                    updateCrownValue()
                 }
 
                 crownControl(
                     title: "REPS",
                     value: "\(set.reps)",
-                    isFocused: focusedField == .reps
+                    isFocused: selectedField == .reps
                 ) {
-                    focusedField = .reps
-                }
-                .digitalCrownRotation(
-                    $crownReps,
-                    from: 0,
-                    through: 200,
-                    by: 1,
-                    sensitivity: .low,
-                    isContinuous: true,
-                    isHapticFeedbackEnabled: true
-                )
-                .focusable(true)
-                .focused($focusedField, equals: .reps)
-                .onChange(of: crownReps) { _, newValue in
-                    let reps = max(Int(newValue.rounded()), 0)
-                    if set.reps != reps {
-                        set.reps = reps
-                        scheduleUpdate()
-                    }
+                    selectedField = .reps
+                    crownFocused = true
+                    updateCrownValue()
                 }
             }
 
@@ -473,18 +441,47 @@ private struct WatchActiveSetView: View {
             }
             .padding(.top, 6)
         }
+        .focusable(true)
+        .focused($crownFocused)
+        .digitalCrownRotation(
+            $crownValue,
+            from: 0,
+            through: selectedField == .weight ? 1000 : 200,
+            by: selectedField == .weight ? 0.5 : 1,
+            sensitivity: selectedField == .weight ? .medium : .low,
+            isContinuous: true,
+            isHapticFeedbackEnabled: true
+        )
         .onAppear {
-            crownWeight = set.weight
-            crownReps = Double(set.reps)
+            updateCrownValue()
+            crownFocused = true
+        }
+        .onChange(of: selectedField) { _, _ in
+            updateCrownValue()
+        }
+        .onChange(of: crownValue) { _, newValue in
+            if selectedField == .weight {
+                let rounded = round(newValue * 2) / 2
+                if set.weight != rounded {
+                    set.weight = rounded
+                    scheduleUpdate()
+                }
+            } else {
+                let reps = max(Int(newValue.rounded()), 0)
+                if set.reps != reps {
+                    set.reps = reps
+                    scheduleUpdate()
+                }
+            }
         }
         .onChange(of: set.weight) { _, newValue in
-            if focusedField != .weight {
-                crownWeight = newValue
+            if selectedField == .weight {
+                crownValue = newValue
             }
         }
         .onChange(of: set.reps) { _, newValue in
-            if focusedField != .reps {
-                crownReps = Double(newValue)
+            if selectedField == .reps {
+                crownValue = Double(newValue)
             }
         }
     }
@@ -519,6 +516,14 @@ private struct WatchActiveSetView: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
+    }
+
+    private func updateCrownValue() {
+        if selectedField == .weight {
+            crownValue = set.weight
+        } else {
+            crownValue = Double(set.reps)
+        }
     }
 
     private func formatWeight(_ value: Double) -> String {

@@ -30,11 +30,20 @@ struct ExerciseDBConfig {
 
 #if DEBUG
     private static func readAPIKeyFromLocalXCConfig() -> String? {
+        if let bundleURL = Bundle.main.url(forResource: "Config", withExtension: "xcconfig"),
+           let fromBundle = readAPIKey(from: bundleURL) {
+            return fromBundle
+        }
+
         let sourceFilePath = URL(fileURLWithPath: #filePath)
         let projectRoot = sourceFilePath.deletingLastPathComponent().deletingLastPathComponent()
         let configURL = projectRoot.appendingPathComponent("Config.xcconfig")
 
-        guard let content = try? String(contentsOf: configURL, encoding: .utf8) else {
+        return readAPIKey(from: configURL)
+    }
+
+    private static func readAPIKey(from url: URL) -> String? {
+        guard let content = try? String(contentsOf: url, encoding: .utf8) else {
             return nil
         }
 
@@ -108,6 +117,13 @@ final class ExerciseDBService {
             throw URLError(.badServerResponse)
         }
 
+#if DEBUG
+        if !(200..<300).contains(httpResponse.statusCode) {
+            let body = String(data: data, encoding: .utf8) ?? "<non-utf8 body>"
+            print("[ExerciseDB] Status: \(httpResponse.statusCode)")
+            print("[ExerciseDB] Response: \(body)")
+        }
+#endif
         guard 200..<300 ~= httpResponse.statusCode else {
             throw URLError(.badServerResponse)
         }

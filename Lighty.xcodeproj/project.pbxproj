@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		D10671B92F366B96002DCEBB /* LightyWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = D10671AF2F366B95002DCEBB /* LightyWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		D1B23DDA2F35BCAD00F3B2C3 /* Config.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = D1B23DD82F35BCAD00F3B2C3 /* Config.xcconfig */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -189,6 +190,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D1B23DDA2F35BCAD00F3B2C3 /* Config.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

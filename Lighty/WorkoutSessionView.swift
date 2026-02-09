@@ -564,6 +564,7 @@ struct WorkoutSessionView: View {
                             .buttonStyle(SoftFillButtonStyle())
 
                             Button {
+                                notifyWatchDiscarded()
                                 workoutSession.discard()
                             } label: {
                                 HStack(spacing: 8) {
@@ -738,6 +739,10 @@ struct WorkoutSessionView: View {
         .onReceive(NotificationCenter.default.publisher(for: .watchSessionFinished)) { _ in
             showFinishOptions = false
             workoutSession.finish(using: store, updateRoutine: false)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .watchSessionDiscarded)) { _ in
+            showFinishOptions = false
+            workoutSession.discard()
         }
         .onChange(of: workoutSession.restRemainingSeconds) { _, newValue in
             if let newValue, !lastRestSentWasActive {
@@ -1046,6 +1051,11 @@ struct WorkoutSessionView: View {
     private func notifyWatchFinished() {
         guard let sessionId = workoutSession.sessionID?.uuidString else { return }
         connectivity.sendSessionFinished(sessionId: sessionId)
+    }
+
+    private func notifyWatchDiscarded() {
+        guard let sessionId = workoutSession.sessionID?.uuidString else { return }
+        connectivity.sendSessionDiscarded(sessionId: sessionId)
     }
 
     private func sendRestToWatch(remainingSeconds: Int) {

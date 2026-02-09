@@ -13,6 +13,7 @@ final class WatchConnectivityCoordinator: NSObject, ObservableObject {
     @Published var lastSessionPayload: [String: Any]?
     @Published var didReceiveSessionFinished = false
     @Published var lastRestPayload: [String: Any]?
+    @Published var didReceiveSessionDiscarded = false
 
     private let session: WCSession? = WCSession.isSupported() ? .default : nil
 
@@ -210,6 +211,28 @@ final class WatchConnectivityCoordinator: NSObject, ObservableObject {
         }
     }
 
+    func sendSessionDiscarded(sessionId: String) {
+        guard let session else { return }
+
+        let payload: [String: Any] = [
+            "type": "session_discarded",
+            "origin": "watch",
+            "sessionId": sessionId,
+            "sentAt": Date().timeIntervalSince1970
+        ]
+
+        if session.isReachable {
+            session.sendMessage(payload, replyHandler: nil) { [weak self] error in
+                Task { @MainActor in
+                    self?.lastEventDescription = "Discard send failed: \(error.localizedDescription)"
+                }
+            }
+        } else {
+            session.transferUserInfo(payload)
+            lastEventDescription = "Discard queued"
+        }
+    }
+
     private func refreshSessionState() {
         guard let session else { return }
         isCompanionAppInstalled = session.isCompanionAppInstalled
@@ -316,6 +339,12 @@ extension WatchConnectivityCoordinator: WCSessionDelegate {
         if type == "session_finished" {
             didReceiveSessionFinished = true
             lastEventDescription = "Session finished from iPhone"
+            return
+        }
+
+        if type == "session_discarded" {
+            didReceiveSessionDiscarded = true
+            lastEventDescription = "Session discarded from iPhone"
             return
         }
 

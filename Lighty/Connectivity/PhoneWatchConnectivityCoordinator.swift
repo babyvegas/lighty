@@ -104,6 +104,29 @@ final class PhoneWatchConnectivityCoordinator: NSObject, ObservableObject {
         }
     }
 
+    func sendSessionDiscarded(sessionId: String) {
+        guard let session else { return }
+        guard session.isPaired, session.isWatchAppInstalled else { return }
+
+        let payload: [String: Any] = [
+            "type": "session_discarded",
+            "origin": "iphone",
+            "sessionId": sessionId,
+            "sentAt": Date().timeIntervalSince1970
+        ]
+
+        if session.isReachable {
+            session.sendMessage(payload, replyHandler: nil) { [weak self] error in
+                Task { @MainActor in
+                    self?.lastEventDescription = "Discard send failed: \(error.localizedDescription)"
+                }
+            }
+        } else {
+            session.transferUserInfo(payload)
+            lastEventDescription = "Discard queued"
+        }
+    }
+
     func sendRestAdjustment(sessionId: String, exerciseId: String, remainingSeconds: Int, exerciseName: String) {
         guard let session else { return }
         guard session.isPaired, session.isWatchAppInstalled else { return }
@@ -301,6 +324,16 @@ extension PhoneWatchConnectivityCoordinator: WCSessionDelegate {
             return
         }
 
+        if type == "session_discarded" {
+            NotificationCenter.default.post(
+                name: .watchSessionDiscarded,
+                object: nil,
+                userInfo: payload
+            )
+            lastEventDescription = "Discard request from watch"
+            return
+        }
+
         lastEventDescription = "Received \(type) from watch"
     }
 }
@@ -312,4 +345,5 @@ extension Notification.Name {
     static let watchSessionFinished = Notification.Name("lighty.watchSessionFinished")
     static let watchSetAdded = Notification.Name("lighty.watchSetAdded")
     static let watchSetDeleted = Notification.Name("lighty.watchSetDeleted")
+    static let watchSessionDiscarded = Notification.Name("lighty.watchSessionDiscarded")
 }

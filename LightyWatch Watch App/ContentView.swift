@@ -53,6 +53,14 @@ struct ContentView: View {
             restExerciseId = nil
             connectivity.didReceiveSessionFinished = false
         }
+        .onReceive(connectivity.$didReceiveSessionDiscarded) { discarded in
+            guard discarded else { return }
+            session.reset()
+            restRemainingSeconds = nil
+            restExerciseName = ""
+            restExerciseId = nil
+            connectivity.didReceiveSessionDiscarded = false
+        }
         .fullScreenCover(
             isPresented: Binding(
                 get: { restRemainingSeconds != nil },
@@ -141,6 +149,12 @@ struct ContentView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.blue)
+
+                    Button("Descartar entrenamiento") {
+                        discardWorkout()
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
                 }
             }
             .padding(.horizontal, 8)
@@ -300,6 +314,18 @@ struct ContentView: View {
         restExerciseId = nil
     }
 
+    private func discardWorkout() {
+        guard !session.sessionId.isEmpty else {
+            session.reset()
+            return
+        }
+        connectivity.sendSessionDiscarded(sessionId: session.sessionId)
+        session.reset()
+        restRemainingSeconds = nil
+        restExerciseName = ""
+        restExerciseId = nil
+    }
+
     private var syncColor: Color {
         let isLive = connectivity.isReachable && connectivity.isCompanionAppInstalled
         return isLive ? .green : Color.gray.opacity(0.7)
@@ -410,14 +436,14 @@ private struct WatchActiveSetView: View {
                     set.isCompleted.toggle()
                     onComplete(set.isCompleted)
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "checkmark")
-                        Text("Completar")
-                    }
-                    .frame(maxWidth: .infinity)
+                    Image(systemName: "checkmark")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Color.blue)
+                        .clipShape(Circle())
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.blue)
+                .buttonStyle(.plain)
 
                 Button {
                     onNext()

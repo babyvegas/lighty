@@ -1,16 +1,6 @@
 import SwiftUI
 internal import Combine
 
-private extension URL {
-    func appending(queryItems: [URLQueryItem]) -> URL {
-        guard var components = URLComponents(url: self, resolvingAgainstBaseURL: false) else {
-            return self
-        }
-        components.queryItems = (components.queryItems ?? []) + queryItems
-        return components.url ?? self
-    }
-}
-
 struct AddExerciseCatalogView: View {
     @EnvironmentObject private var store: RoutineStore
     @Environment(\.dismiss) private var dismiss
@@ -222,11 +212,12 @@ final class ExerciseCatalogViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         do {
+            let exercises = try await service.fetchPopularExercises(limit: 24)
+            let mapped = exercises.map(mapToCatalogItem)
+            popularExercises = mapped
             if allExercises.isEmpty {
-                let exercises = try await service.fetchAllExercises()
-                allExercises = exercises.map(mapToCatalogItem)
+                allExercises = mapped
             }
-            popularExercises = Array(allExercises.prefix(20))
         } catch {
             popularExercises = []
         }
@@ -315,23 +306,29 @@ final class ExerciseCatalogViewModel: ObservableObject {
     }
 
     private func mapToCatalogItem(_ exercise: ExerciseDBExercise) -> ExerciseCatalogItem {
-        let imageURL = ExerciseDBConfig.baseURL
-            .appendingPathComponent("image")
-            .appending(queryItems: [
-                URLQueryItem(name: "resolution", value: "180"),
-                URLQueryItem(name: "exerciseId", value: exercise.id)
-            ])
+        let imageURL = exercise.imageUrl.flatMap(URL.init(string:))
+        let primaryMuscle = titleCased(exercise.target)
+        let secondaryMuscles = exercise.secondaryMuscles.map(titleCased)
+        let fallbackSecondary = secondaryMuscles.isEmpty ? [titleCased(exercise.bodyPart)] : secondaryMuscles
 
         return ExerciseCatalogItem(
             id: exercise.id,
-            name: exercise.name.capitalized,
-            muscle: exercise.target.capitalized,
-            equipment: exercise.equipment.capitalized,
+            name: titleCased(exercise.name),
+            muscle: primaryMuscle,
+            equipment: titleCased(exercise.equipment),
             imageURL: imageURL,
             mediaURL: exercise.gifUrl.flatMap(URL.init(string:)),
-            primaryMuscle: exercise.target.capitalized,
-            secondaryMuscles: [exercise.bodyPart.capitalized]
+            primaryMuscle: primaryMuscle,
+            secondaryMuscles: fallbackSecondary
         )
+    }
+
+    private func titleCased(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .capitalized
     }
 }
 
@@ -396,14 +393,13 @@ struct RemoteThumbnailView<Placeholder: View>: View {
 
     private func loadImage() async {
         guard let url = imageURL else { return }
-        do {
-            var request = URLRequest(url: url)
-            if url.host?.contains("rapidapi.com") == true {
-                request.setValue(ExerciseDBConfig.apiKey, forHTTPHeaderField: "X-RapidAPI-Key")
-                request.setValue(ExerciseDBConfig.host, forHTTPHeaderField: "X-RapidAPI-Host")
-            }
+        if let cached = RemoteImageCache.shared.image(for: url) {
+            image = Image(uiImage: cached)
+            return
+        }
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
             guard let httpResponse = response as? HTTPURLResponse else {
                 return
             }
@@ -416,6 +412,7 @@ struct RemoteThumbnailView<Placeholder: View>: View {
                 return
             }
 
+            RemoteImageCache.shared.store(uiImage, for: url)
             image = Image(uiImage: uiImage)
         } catch {
             // Keep placeholder on failure.

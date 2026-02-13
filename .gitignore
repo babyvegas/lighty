@@ -1,3 +1,11 @@
 .env
 Config.xcconfig
 Lighty.xcodeproj/xcuserdata/
+
+# Xcode user-specific files (local machine state)
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+**/xcschememanagement.plist
+*.xcodeproj/xcshareddata/xcschemes/*.xcscheme
+**/xcdebugger/Breakpoints_v2.xcbkptlist
+*.xcuserstate

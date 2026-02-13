@@ -234,14 +234,13 @@ private struct ExerciseMediaPanel: View {
             return
         }
 
-        do {
-            var request = URLRequest(url: imageURL)
-            if imageURL.host?.contains("rapidapi.com") == true {
-                request.setValue(ExerciseDBConfig.apiKey, forHTTPHeaderField: "X-RapidAPI-Key")
-                request.setValue(ExerciseDBConfig.host, forHTTPHeaderField: "X-RapidAPI-Host")
-            }
+        if let cached = RemoteImageCache.shared.image(for: imageURL) {
+            loadedImage = Image(uiImage: cached)
+            return
+        }
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+        do {
+            let (data, response) = try await URLSession.shared.data(from: imageURL)
             guard let httpResponse = response as? HTTPURLResponse,
                   200..<300 ~= httpResponse.statusCode,
                   let uiImage = UIImage(data: data) else {
@@ -249,6 +248,7 @@ private struct ExerciseMediaPanel: View {
                 return
             }
 
+            RemoteImageCache.shared.store(uiImage, for: imageURL)
             loadedImage = Image(uiImage: uiImage)
         } catch {
             loadedImage = nil

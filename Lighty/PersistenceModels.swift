@@ -140,3 +140,29 @@ final class TrainingSessionEntity {
         self.exerciseSummariesJSON = exerciseSummariesJSON
     }
 }
+
+@Model
+final class ExerciseRecordEntity {
+    @Attribute(.unique) var exerciseKey: String
+    var exerciseName: String
+    var attemptsCount: Int
+    var bestWeight: Double
+    var bestReps: Int
+    var bestAt: Date?
+
+    init(
+        exerciseKey: String,
+        exerciseName: String,
+        attemptsCount: Int = 0,
+        bestWeight: Double = 0,
+        bestReps: Int = 0,
+        bestAt: Date? = nil
+    ) {
+        self.exerciseKey = exerciseKey
+        self.exerciseName = exerciseName
+        self.attemptsCount = attemptsCount
+        self.bestWeight = bestWeight
+        self.bestReps = bestReps
+        self.bestAt = bestAt
+    }
+}

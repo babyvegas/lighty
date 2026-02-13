@@ -350,7 +350,7 @@ private struct HomeLandingView: View {
             HStack(spacing: 8) {
                 metricChip(title: "Tiempo", value: durationLabel(workout.durationSeconds), tint: StyleKit.accentMint)
                 metricChip(title: "Volumen", value: volumeLabel(workout.volume), tint: StyleKit.accentBlue)
-                metricChip(title: "Récords", value: "—")
+                metricChip(title: "Récords", value: recordsLabel(workout.recordsCount))
                 metricChip(title: "Media LPM", value: "—")
             }
 
@@ -462,6 +462,11 @@ private struct HomeLandingView: View {
     private func seriesLabel(for exercise: CompletedTrainingExerciseSummary) -> String {
         let word = exercise.setCount == 1 ? "serie" : "series"
         return "\(exercise.setCount) \(word) \(exercise.name)"
+    }
+
+    private func recordsLabel(_ records: Int?) -> String {
+        guard let records, records > 0 else { return "—" }
+        return "\(records)"
     }
 
     private var greetingTitle: String {

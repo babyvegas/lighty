@@ -8,6 +8,7 @@ struct ExerciseInsightsView: View {
     }
 
     @Binding var exercise: ExerciseEntry
+    @EnvironmentObject private var store: RoutineStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedSection: Section = .summary
@@ -125,21 +126,50 @@ struct ExerciseInsightsView: View {
             .appCard(padding: 14, radius: 14)
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("Progress (Template)")
+                Text("Progress")
                     .font(.headline)
                     .foregroundStyle(StyleKit.ink)
 
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.white.opacity(0.86))
-                    .frame(height: 210)
+                    .frame(height: 180)
                     .overlay {
-                        VStack(spacing: 10) {
-                            Image(systemName: "chart.xyaxis.line")
-                                .font(.title2)
-                                .foregroundStyle(StyleKit.softInk)
-                            Text("History chart placeholder")
-                                .font(.subheadline)
-                                .foregroundStyle(StyleKit.softInk)
+                        if let personalRecord = store.bestPersonalRecord(for: exercise.name) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "medal.fill")
+                                        .font(.headline)
+                                        .foregroundStyle(Color.orange)
+                                    Text("Current PR")
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundStyle(StyleKit.ink)
+                                    Spacer()
+                                }
+
+                                Text("\(formatWeight(personalRecord.weight)) lbs x \(personalRecord.reps) reps")
+                                    .font(.headline.weight(.bold))
+                                    .foregroundStyle(StyleKit.accentBlue)
+
+                                Text("Achieved on \(dateLabel(personalRecord.date))")
+                                    .font(.caption)
+                                    .foregroundStyle(StyleKit.softInk)
+
+                                Spacer()
+                            }
+                            .padding(14)
+                        } else {
+                            VStack(spacing: 10) {
+                                Image(systemName: "chart.xyaxis.line")
+                                    .font(.title2)
+                                    .foregroundStyle(StyleKit.softInk)
+                                Text("No PR yet")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(StyleKit.ink)
+                                Text("Complete a few logged sets to unlock your record.")
+                                    .font(.caption)
+                                    .foregroundStyle(StyleKit.softInk)
+                            }
+                            .padding(.horizontal, 12)
                         }
                     }
             }
@@ -186,6 +216,19 @@ struct ExerciseInsightsView: View {
     private var secondaryMuscleLabel: String {
         let list = exercise.secondaryMuscles.filter { !$0.isEmpty }
         return list.isEmpty ? "Not available" : list.joined(separator: ", ")
+    }
+
+    private func dateLabel(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
+    }
+
+    private func formatWeight(_ value: Double) -> String {
+        if value.truncatingRemainder(dividingBy: 1) == 0 {
+            return "\(Int(value))"
+        }
+        return String(format: "%.1f", value)
     }
 }
 
@@ -268,4 +311,5 @@ private struct ExerciseMediaPanel: View {
             )
         )
     )
+    .environmentObject(RoutineStore())
 }

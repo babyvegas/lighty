@@ -154,6 +154,15 @@ final class WorkoutSessionManager: ObservableObject {
         let finishedElapsed = elapsedSeconds
         let finishedSets = completedSetsCount
         let finishedVolume = totalVolume
+        let exerciseSummaries = exercises.map { exercise in
+            let completedSetCount = exercise.sets.filter(\.isCompleted).count
+            return CompletedTrainingExerciseSummary(
+                id: exercise.id,
+                name: exercise.name,
+                setCount: completedSetCount > 0 ? completedSetCount : exercise.sets.count,
+                imageURL: exercise.imageURL
+            )
+        }
         let updatedExercises = exercises.map { $0.toExerciseEntry() }
         let completedRoutine = Routine(
             name: title,
@@ -161,7 +170,12 @@ final class WorkoutSessionManager: ObservableObject {
             exercises: updatedExercises
         )
 
-        store.recordTraining(from: completedRoutine)
+        store.recordTraining(
+            from: completedRoutine,
+            durationSeconds: finishedElapsed,
+            volume: finishedVolume,
+            exerciseSummaries: exerciseSummaries
+        )
 
         if let sourceRoutineID {
             if updateRoutine {

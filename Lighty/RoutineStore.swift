@@ -78,11 +78,29 @@ final class RoutineStore: ObservableObject {
         persistRecentExercise(exercise)
     }
 
-    func recordTraining(from routine: Routine, date: Date = .now) {
+    func recordTraining(
+        from routine: Routine,
+        date: Date = .now,
+        durationSeconds: Int = 0,
+        volume: Double = 0,
+        exerciseSummaries: [CompletedTrainingExerciseSummary]? = nil
+    ) {
+        let summaries = exerciseSummaries ?? routine.exercises.map {
+            CompletedTrainingExerciseSummary(
+                id: $0.id,
+                name: $0.name,
+                setCount: $0.sets.count,
+                imageURL: $0.imageURL
+            )
+        }
+
         let session = CompletedTraining(
             date: date,
             title: routine.name.isEmpty ? "Workout" : routine.name,
-            exerciseCount: routine.exercises.count
+            exerciseCount: routine.exercises.count,
+            durationSeconds: durationSeconds,
+            volume: volume,
+            exerciseSummaries: summaries
         )
         completedTrainings.insert(session, at: 0)
         persistTrainingSession(session)
@@ -202,7 +220,12 @@ final class RoutineStore: ObservableObject {
             id: session.id,
             performedAt: session.date,
             title: session.title,
-            exerciseCount: session.exerciseCount
+            exerciseCount: session.exerciseCount,
+            durationSeconds: session.durationSeconds,
+            volume: session.volume,
+            recordsCount: session.recordsCount,
+            averageHeartRate: session.averageHeartRate,
+            exerciseSummariesJSON: encodeExerciseSummaries(session.exerciseSummaries)
         )
         context.insert(entity)
         saveContext()
@@ -301,7 +324,12 @@ final class RoutineStore: ObservableObject {
             id: entity.id,
             date: entity.performedAt,
             title: entity.title,
-            exerciseCount: entity.exerciseCount
+            exerciseCount: entity.exerciseCount,
+            durationSeconds: entity.durationSeconds ?? 0,
+            volume: entity.volume ?? 0,
+            recordsCount: entity.recordsCount,
+            averageHeartRate: entity.averageHeartRate,
+            exerciseSummaries: decodeExerciseSummaries(entity.exerciseSummariesJSON)
         )
     }
 
@@ -319,5 +347,24 @@ final class RoutineStore: ObservableObject {
             .map(String.init)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+    }
+
+    private func encodeExerciseSummaries(_ summaries: [CompletedTrainingExerciseSummary]) -> String? {
+        guard !summaries.isEmpty else { return nil }
+        do {
+            let data = try JSONEncoder().encode(summaries)
+            return String(data: data, encoding: .utf8)
+        } catch {
+            return nil
+        }
+    }
+
+    private func decodeExerciseSummaries(_ json: String?) -> [CompletedTrainingExerciseSummary] {
+        guard let json, let data = json.data(using: .utf8) else { return [] }
+        do {
+            return try JSONDecoder().decode([CompletedTrainingExerciseSummary].self, from: data)
+        } catch {
+            return []
+        }
     }
 }

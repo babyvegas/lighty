@@ -112,11 +112,31 @@ final class TrainingSessionEntity {
     var performedAt: Date
     var title: String
     var exerciseCount: Int
+    var durationSeconds: Int?
+    var volume: Double?
+    var recordsCount: Int?
+    var averageHeartRate: Double?
+    var exerciseSummariesJSON: String?
 
-    init(id: UUID, performedAt: Date, title: String, exerciseCount: Int) {
+    init(
+        id: UUID,
+        performedAt: Date,
+        title: String,
+        exerciseCount: Int,
+        durationSeconds: Int? = nil,
+        volume: Double? = nil,
+        recordsCount: Int? = nil,
+        averageHeartRate: Double? = nil,
+        exerciseSummariesJSON: String? = nil
+    ) {
         self.id = id
         self.performedAt = performedAt
         self.title = title
         self.exerciseCount = exerciseCount
+        self.durationSeconds = durationSeconds
+        self.volume = volume
+        self.recordsCount = recordsCount
+        self.averageHeartRate = averageHeartRate
+        self.exerciseSummariesJSON = exerciseSummariesJSON
     }
 }

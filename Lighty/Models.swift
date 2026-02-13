@@ -84,11 +84,45 @@ struct CompletedTraining: Identifiable, Hashable {
     var date: Date
     var title: String
     var exerciseCount: Int
+    var durationSeconds: Int
+    var volume: Double
+    var recordsCount: Int?
+    var averageHeartRate: Double?
+    var exerciseSummaries: [CompletedTrainingExerciseSummary]
 
-    init(id: UUID = UUID(), date: Date = .now, title: String, exerciseCount: Int) {
+    init(
+        id: UUID = UUID(),
+        date: Date = .now,
+        title: String,
+        exerciseCount: Int,
+        durationSeconds: Int = 0,
+        volume: Double = 0,
+        recordsCount: Int? = nil,
+        averageHeartRate: Double? = nil,
+        exerciseSummaries: [CompletedTrainingExerciseSummary] = []
+    ) {
         self.id = id
         self.date = date
         self.title = title
         self.exerciseCount = exerciseCount
+        self.durationSeconds = durationSeconds
+        self.volume = volume
+        self.recordsCount = recordsCount
+        self.averageHeartRate = averageHeartRate
+        self.exerciseSummaries = exerciseSummaries
+    }
+}
+
+struct CompletedTrainingExerciseSummary: Identifiable, Hashable, Codable {
+    let id: UUID
+    var name: String
+    var setCount: Int
+    var imageURL: URL?
+
+    init(id: UUID = UUID(), name: String, setCount: Int, imageURL: URL? = nil) {
+        self.id = id
+        self.name = name
+        self.setCount = setCount
+        self.imageURL = imageURL
     }
 }

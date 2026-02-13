@@ -209,29 +209,25 @@ private struct HomeLandingView: View {
                         emptyState
                     } else {
                         ForEach(groupedTrainings, id: \.date) { section in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(dayLabel(for: section.date))
-                                    .font(.headline)
-                                    .foregroundStyle(StyleKit.ink)
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack {
+                                    Label(dayLabel(for: section.date), systemImage: "calendar")
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundStyle(StyleKit.ink)
+
+                                    Spacer()
+
+                                    Text(sessionCountLabel(section.items.count))
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(StyleKit.accentBlue)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(StyleKit.softChip.opacity(0.72))
+                                .clipShape(Capsule())
 
                                 ForEach(section.items) { workout in
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(workout.title)
-                                                .fontWeight(.semibold)
-                                                .foregroundStyle(StyleKit.ink)
-                                            Text("\(workout.exerciseCount) exercises")
-                                                .font(.footnote)
-                                                .foregroundStyle(StyleKit.softInk)
-                                        }
-
-                                        Spacer()
-
-                                        Text(timeLabel(for: workout.date))
-                                            .font(.footnote)
-                                            .foregroundStyle(StyleKit.softInk)
-                                    }
-                                    .appCard()
+                                    trainingCard(workout)
                                 }
                             }
                         }
@@ -248,13 +244,13 @@ private struct HomeLandingView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Home")
-                        .font(.largeTitle.bold())
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(greetingTitle)
+                        .font(.title2.bold())
                         .foregroundStyle(StyleKit.ink)
-                    Text("Your workout timeline")
+                    Text("Tu timeline de entrenamientos")
                         .font(.subheadline)
                         .foregroundStyle(StyleKit.softInk)
                 }
@@ -263,19 +259,42 @@ private struct HomeLandingView: View {
 
                 ZStack {
                     Circle()
-                        .fill(StyleKit.accentMint.opacity(0.25))
-                        .frame(width: 54, height: 54)
-                    Image(systemName: "calendar")
-                        .font(.title3)
+                        .fill(StyleKit.accentMint.opacity(0.32))
+                        .frame(width: 58, height: 58)
+                    Circle()
+                        .fill(StyleKit.accentPink.opacity(0.26))
+                        .frame(width: 42, height: 42)
+                        .offset(x: -8, y: -8)
+                    Image(systemName: "figure.run.circle.fill")
+                        .font(.title2)
                         .foregroundStyle(StyleKit.accentBlue)
                 }
             }
 
-            Text("Sessions done: \(store.completedTrainings.count)")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(StyleKit.accentBlue)
+            HStack(spacing: 8) {
+                topStatChip(title: "Sesiones", value: "\(store.completedTrainings.count)")
+                topStatChip(title: "Semana", value: "\(weeklySessions)")
+                topStatChip(title: "Min", value: "\(totalTrackedMinutes)")
+            }
         }
-        .appCard(padding: 16, radius: 20)
+        .padding(16)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.95),
+                    StyleKit.accentMint.opacity(0.16),
+                    StyleKit.accentPink.opacity(0.14)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22)
+                .stroke(Color.white.opacity(0.92), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .shadow(color: Color.black.opacity(0.05), radius: 12, y: 6)
     }
 
     private var emptyState: some View {
@@ -303,6 +322,116 @@ private struct HomeLandingView: View {
         .appCard(padding: 16, radius: 22)
     }
 
+    private func trainingCard(_ workout: CompletedTraining) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(workout.title)
+                        .font(.headline.bold())
+                        .foregroundStyle(StyleKit.ink)
+                        .lineLimit(2)
+                    Text("\(workout.exerciseCount) ejercicios")
+                        .font(.caption)
+                        .foregroundStyle(StyleKit.softInk)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 5) {
+                    Text(timeLabel(for: workout.date))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(StyleKit.softInk)
+                    Image(systemName: "clock.badge.checkmark.fill")
+                        .font(.caption)
+                        .foregroundStyle(StyleKit.accentBlue.opacity(0.9))
+                }
+            }
+
+            HStack(spacing: 8) {
+                metricChip(title: "Tiempo", value: durationLabel(workout.durationSeconds), tint: StyleKit.accentMint)
+                metricChip(title: "Volumen", value: volumeLabel(workout.volume), tint: StyleKit.accentBlue)
+                metricChip(title: "Récords", value: "—")
+                metricChip(title: "Media LPM", value: "—")
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                if workout.exerciseSummaries.isEmpty {
+                    Text("\(workout.exerciseCount) ejercicios")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(StyleKit.softInk)
+                } else {
+                    ForEach(Array(workout.exerciseSummaries.prefix(3))) { exercise in
+                        HStack(spacing: 10) {
+                            ExerciseRowThumbnail(imageURL: exercise.imageURL)
+                            Text(seriesLabel(for: exercise))
+                                .font(.subheadline)
+                                .foregroundStyle(StyleKit.ink)
+                                .lineLimit(1)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 7)
+                        .background(Color.white.opacity(0.64))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                }
+            }
+
+            if !workout.exerciseSummaries.isEmpty {
+                NavigationLink {
+                    CompletedTrainingExercisesView(training: workout)
+                } label: {
+                    HStack(spacing: 6) {
+                        Spacer()
+                        Text("Ver más ejercicios")
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.bold))
+                        Spacer()
+                    }
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(StyleKit.softInk)
+                        .padding(.top, 2)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .appCard(padding: 14, radius: 16)
+    }
+
+    private func metricChip(title: String, value: String, tint: Color = StyleKit.softChip) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(StyleKit.softInk)
+            Text(value)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(StyleKit.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .background(tint.opacity(0.18))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func topStatChip(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(StyleKit.softInk)
+            Text(value)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(StyleKit.ink)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.white.opacity(0.8))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
     private func dayLabel(for date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
@@ -313,6 +442,92 @@ private struct HomeLandingView: View {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
         return formatter.string(from: date)
+    }
+
+    private func durationLabel(_ seconds: Int) -> String {
+        guard seconds > 0 else { return "0m" }
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        }
+        return "\(minutes)m"
+    }
+
+    private func volumeLabel(_ volume: Double) -> String {
+        let rounded = Int(volume.rounded())
+        return "\(rounded) lbs"
+    }
+
+    private func seriesLabel(for exercise: CompletedTrainingExerciseSummary) -> String {
+        let word = exercise.setCount == 1 ? "serie" : "series"
+        return "\(exercise.setCount) \(word) \(exercise.name)"
+    }
+
+    private var greetingTitle: String {
+        let hour = Calendar.current.component(.hour, from: .now)
+        switch hour {
+        case 5..<12:
+            return "Buenos días"
+        case 12..<19:
+            return "Buenas tardes"
+        default:
+            return "Buenas noches"
+        }
+    }
+
+    private var weeklySessions: Int {
+        let calendar = Calendar.current
+        let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: .now)?.start ?? .distantPast
+        return store.completedTrainings.filter { $0.date >= startOfWeek }.count
+    }
+
+    private var totalTrackedMinutes: Int {
+        let totalSeconds = store.completedTrainings.reduce(0) { $0 + max(0, $1.durationSeconds) }
+        return totalSeconds / 60
+    }
+
+    private func sessionCountLabel(_ count: Int) -> String {
+        let word = count == 1 ? "sesión" : "sesiones"
+        return "\(count) \(word)"
+    }
+}
+
+private struct CompletedTrainingExercisesView: View {
+    let training: CompletedTraining
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(training.exerciseSummaries) { exercise in
+                    HStack(spacing: 10) {
+                        ExerciseRowThumbnail(imageURL: exercise.imageURL)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(exercise.name)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(StyleKit.ink)
+                                .lineLimit(2)
+                            Text(seriesLabel(exercise))
+                                .font(.caption)
+                                .foregroundStyle(StyleKit.softInk)
+                        }
+                        Spacer()
+                    }
+                    .appCard(padding: 12, radius: 14)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top, 12)
+            .padding(.bottom, 28)
+        }
+        .background(Color.clear)
+        .navigationTitle("Ejercicios")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func seriesLabel(_ exercise: CompletedTrainingExerciseSummary) -> String {
+        let word = exercise.setCount == 1 ? "serie" : "series"
+        return "\(exercise.setCount) \(word)"
     }
 }
 

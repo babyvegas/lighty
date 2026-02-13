@@ -109,10 +109,13 @@ final class WorkoutSessionManager: ObservableObject {
     @Published private(set) var sourceRoutineDescription: String = ""
     @Published private(set) var sourceRoutineExercises: [ExerciseEntry] = []
     @Published var completionToast: WorkoutCompletionToast?
+    @Published var personalRecordToast: WorkoutCompletionToast?
 
     private var startedAt: Date?
     private var elapsedTicker: AnyCancellable?
     private var restTicker: AnyCancellable?
+    private var liveRecordStates: [String: ExerciseRecordSnapshot] = [:]
+    private var completedSetTracking: Set<UUID> = []
 
     func begin(from routine: Routine) {
         stopTimers()
@@ -164,6 +167,8 @@ final class WorkoutSessionManager: ObservableObject {
             )
         }
         let updatedExercises = exercises.map { $0.toExerciseEntry() }
+        let completedSetRecords = buildCompletedSetRecords()
+        let recordsCount = store.persistCompletedSetRecords(completedSetRecords)
         let completedRoutine = Routine(
             name: title,
             description: "",
@@ -174,6 +179,7 @@ final class WorkoutSessionManager: ObservableObject {
             from: completedRoutine,
             durationSeconds: finishedElapsed,
             volume: finishedVolume,
+            recordsCount: recordsCount,
             exerciseSummaries: exerciseSummaries
         )
 
@@ -238,6 +244,10 @@ final class WorkoutSessionManager: ObservableObject {
         completionToast = nil
     }
 
+    func clearPersonalRecordToast() {
+        personalRecordToast = nil
+    }
+
     func discard() {
         endSession()
     }
@@ -264,7 +274,7 @@ final class WorkoutSessionManager: ObservableObject {
         exercises = updated
     }
 
-    func toggleSetCompletion(exerciseIndex: Int, setIndex: Int) {
+    func toggleSetCompletion(exerciseIndex: Int, setIndex: Int, store: RoutineStore? = nil) {
         guard exercises.indices.contains(exerciseIndex),
               exercises[exerciseIndex].sets.indices.contains(setIndex) else {
             return
@@ -272,12 +282,18 @@ final class WorkoutSessionManager: ObservableObject {
 
         var updated = exercises
         updated[exerciseIndex].sets[setIndex].isCompleted.toggle()
-        let isNowCompleted = updated[exerciseIndex].sets[setIndex].isCompleted
+        let currentSet = updated[exerciseIndex].sets[setIndex]
+        let isNowCompleted = currentSet.isCompleted
         let restMinutes = updated[exerciseIndex].restMinutes
         let exerciseName = updated[exerciseIndex].name
         exercises = updated
 
         if isNowCompleted {
+            processPotentialPersonalRecord(
+                set: currentSet,
+                exerciseName: exerciseName,
+                store: store
+            )
             startRestIfNeeded(
                 restMinutes: restMinutes,
                 exerciseName: exerciseName,
@@ -365,6 +381,9 @@ final class WorkoutSessionManager: ObservableObject {
         sourceRoutineID = nil
         sourceRoutineDescription = ""
         sourceRoutineExercises = []
+        personalRecordToast = nil
+        liveRecordStates.removeAll()
+        completedSetTracking.removeAll()
     }
 
     private func startSession(title: String, exercises: [WorkoutSessionExercise]) {
@@ -380,6 +399,9 @@ final class WorkoutSessionManager: ObservableObject {
         restRemainingSeconds = nil
         restExerciseName = ""
         restExerciseId = nil
+        personalRecordToast = nil
+        liveRecordStates.removeAll()
+        completedSetTracking.removeAll()
         startElapsedTimer()
     }
 
@@ -413,7 +435,7 @@ final class WorkoutSessionManager: ObservableObject {
         ]
     }
 
-    func applyRemoteSetToggle(exerciseId: UUID, setId: UUID, isCompleted: Bool) {
+    func applyRemoteSetToggle(exerciseId: UUID, setId: UUID, isCompleted: Bool, store: RoutineStore? = nil) {
         guard let exerciseIndex = exercises.firstIndex(where: { $0.id == exerciseId }),
               let setIndex = exercises[exerciseIndex].sets.firstIndex(where: { $0.id == setId }) else {
             return
@@ -421,12 +443,19 @@ final class WorkoutSessionManager: ObservableObject {
 
         var updated = exercises
         updated[exerciseIndex].sets[setIndex].isCompleted = isCompleted
+        let currentSet = updated[exerciseIndex].sets[setIndex]
+        let exerciseName = updated[exerciseIndex].name
         exercises = updated
 
         if isCompleted {
+            processPotentialPersonalRecord(
+                set: currentSet,
+                exerciseName: exerciseName,
+                store: store
+            )
             startRestIfNeeded(
                 restMinutes: updated[exerciseIndex].restMinutes,
-                exerciseName: updated[exerciseIndex].name,
+                exerciseName: exerciseName,
                 exerciseId: updated[exerciseIndex].id
             )
         }
@@ -562,6 +591,82 @@ final class WorkoutSessionManager: ObservableObject {
         let subtitle = "Great job. \(duration), \(sets) sets, \(volumeLabel) lbs moved. Keep showing up."
         return WorkoutCompletionToast(title: title, subtitle: subtitle, icon: icon)
     }
+
+    private func buildCompletedSetRecords() -> [CompletedSetRecord] {
+        let now = Date()
+        var records: [CompletedSetRecord] = []
+
+        for exercise in exercises {
+            for set in exercise.sets where set.isCompleted {
+                guard set.weight > 0, set.reps > 0 else { continue }
+                records.append(
+                    CompletedSetRecord(
+                        exerciseName: exercise.name,
+                        weight: set.weight,
+                        reps: set.reps,
+                        completedAt: now
+                    )
+                )
+            }
+        }
+
+        return records
+    }
+
+    private func processPotentialPersonalRecord(set: WorkoutSessionSet, exerciseName: String, store: RoutineStore?) {
+        guard let store else { return }
+        guard set.weight > 0, set.reps > 0 else { return }
+        guard !completedSetTracking.contains(set.id) else { return }
+
+        let key = normalizedExerciseKey(exerciseName)
+        var state = liveRecordStates[key] ?? store.exerciseRecordSnapshot(for: exerciseName)
+        let hadHistory = state.attemptsCount > 0
+        let isNewRecord = hadHistory && isBetterRecord(
+            weight: set.weight,
+            reps: set.reps,
+            thanWeight: state.bestWeight,
+            reps: state.bestReps
+        )
+
+        state.attemptsCount += 1
+        if state.attemptsCount == 1 || isNewRecord {
+            state.bestWeight = set.weight
+            state.bestReps = set.reps
+            state.bestDate = .now
+        }
+
+        liveRecordStates[key] = state
+        completedSetTracking.insert(set.id)
+
+        if isNewRecord {
+            personalRecordToast = WorkoutCompletionToast(
+                title: "New Personal Record",
+                subtitle: "\(exerciseName) · \(formatRecordWeight(set.weight)) lbs x \(set.reps) reps",
+                icon: "medal.fill"
+            )
+        }
+    }
+
+    private func isBetterRecord(weight candidateWeight: Double, reps candidateReps: Int, thanWeight bestWeight: Double, reps bestReps: Int) -> Bool {
+        let sameOrMoreReps = candidateReps >= bestReps
+        let sameOrMoreWeight = candidateWeight >= bestWeight
+        let improvesWeight = candidateWeight > bestWeight && sameOrMoreReps
+        let improvesReps = candidateReps > bestReps && sameOrMoreWeight
+        return improvesWeight || improvesReps
+    }
+
+    private func normalizedExerciseKey(_ name: String) -> String {
+        name
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
+    private func formatRecordWeight(_ value: Double) -> String {
+        if value.truncatingRemainder(dividingBy: 1) == 0 {
+            return "\(Int(value))"
+        }
+        return String(format: "%.1f", value)
+    }
 }
 
 struct WorkoutSessionView: View {
@@ -576,6 +681,8 @@ struct WorkoutSessionView: View {
     @State private var showFinishOptions = false
     @State private var lastRestSentWasActive = false
     @State private var finishTriggeredFromWatch = false
+    @State private var visiblePRToast: WorkoutCompletionToast?
+    @State private var prToastDismissTask: Task<Void, Never>?
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -648,6 +755,14 @@ struct WorkoutSessionView: View {
                     .padding(.horizontal)
                     .padding(.bottom, 18)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            if let visiblePRToast {
+                personalRecordToastBanner(visiblePRToast)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .onAppear {
@@ -737,7 +852,8 @@ struct WorkoutSessionView: View {
             workoutSession.applyRemoteSetToggle(
                 exerciseId: exerciseId,
                 setId: setId,
-                isCompleted: isCompleted
+                isCompleted: isCompleted,
+                store: store
             )
             syncSessionSnapshot()
         }
@@ -848,6 +964,29 @@ struct WorkoutSessionView: View {
                 lastRestSentWasActive = false
                 sendRestToWatch(remainingSeconds: 0)
             }
+        }
+        .onChange(of: workoutSession.personalRecordToast) { _, newValue in
+            guard let newValue else { return }
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) {
+                visiblePRToast = newValue
+            }
+
+            prToastDismissTask?.cancel()
+            prToastDismissTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2.4))
+                if Task.isCancelled { return }
+
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    visiblePRToast = nil
+                }
+
+                try? await Task.sleep(for: .milliseconds(220))
+                if Task.isCancelled { return }
+                workoutSession.clearPersonalRecordToast()
+            }
+        }
+        .onDisappear {
+            prToastDismissTask?.cancel()
         }
         .interactiveDismissDisabled()
     }
@@ -976,24 +1115,24 @@ struct WorkoutSessionView: View {
                         .foregroundStyle(StyleKit.softInk)
                         .frame(width: 72, alignment: .leading)
 
-                    TextField(
-                        "0",
+                    EditableDecimalField(
                         value: $workoutSession.exercises[exerciseIndex].sets[setIndex].weight,
-                        format: .number.precision(.fractionLength(0...1))
+                        width: 72
                     )
-                        .keyboardType(.decimalPad)
-                        .textFieldStyle(.plain)
-                        .frame(width: 72)
 
-                    TextField("0", value: $workoutSession.exercises[exerciseIndex].sets[setIndex].reps, format: .number)
-                        .keyboardType(.numberPad)
-                        .textFieldStyle(.plain)
-                        .frame(width: 58)
+                    EditableIntegerField(
+                        value: $workoutSession.exercises[exerciseIndex].sets[setIndex].reps,
+                        width: 58
+                    )
 
                     Spacer(minLength: 0)
 
                     Button {
-                        workoutSession.toggleSetCompletion(exerciseIndex: exerciseIndex, setIndex: setIndex)
+                        workoutSession.toggleSetCompletion(
+                            exerciseIndex: exerciseIndex,
+                            setIndex: setIndex,
+                            store: store
+                        )
                         syncSessionSnapshot()
                         if let remaining = workoutSession.restRemainingSeconds {
                             sendRestToWatch(remainingSeconds: remaining)
@@ -1128,6 +1267,44 @@ struct WorkoutSessionView: View {
         .shadow(color: Color.black.opacity(0.08), radius: 12, y: 5)
     }
 
+    private func personalRecordToastBanner(_ toast: WorkoutCompletionToast) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: toast.icon)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(Color(red: 0.36, green: 0.31, blue: 0.05))
+                .frame(width: 32, height: 32)
+                .background(Color.white.opacity(0.35))
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(toast.title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(StyleKit.ink)
+                Text(toast.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(StyleKit.softInk)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            LinearGradient(
+                colors: [Color(red: 1.00, green: 0.95, blue: 0.74), Color.white.opacity(0.95)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.white.opacity(0.9), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: Color.black.opacity(0.08), radius: 10, y: 5)
+    }
+
     private func restLabel(for restMinutes: Double) -> String {
         guard restMinutes > 0 else { return "Rest: OFF" }
         let wholeMinutes = Int(restMinutes)
@@ -1194,6 +1371,129 @@ struct WorkoutSessionView: View {
                 workoutSession.exercises[index].secondaryMuscles = updated.secondaryMuscles
             }
         )
+    }
+}
+
+private struct EditableDecimalField: View {
+    @Binding var value: Double
+    let width: CGFloat
+
+    @State private var text: String = ""
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        TextField("0", text: $text)
+            .keyboardType(.decimalPad)
+            .textFieldStyle(.plain)
+            .frame(width: width)
+            .focused($isFocused)
+            .onAppear {
+                text = formatted(value)
+            }
+            .onChange(of: value) { _, newValue in
+                guard !isFocused else { return }
+                text = formatted(newValue)
+            }
+            .onChange(of: text) { _, newText in
+                let sanitized = sanitizeDecimalInput(newText)
+                if sanitized != newText {
+                    text = sanitized
+                    return
+                }
+
+                guard !sanitized.isEmpty, sanitized != "." else { return }
+                if let parsed = Double(sanitized) {
+                    value = max(parsed, 0)
+                }
+            }
+            .onChange(of: isFocused) { _, focused in
+                if !focused {
+                    commitValue()
+                }
+            }
+    }
+
+    private func commitValue() {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != "." else {
+            value = 0
+            text = "0"
+            return
+        }
+
+        if let parsed = Double(trimmed) {
+            value = max(parsed, 0)
+        }
+        text = formatted(value)
+    }
+
+    private func sanitizeDecimalInput(_ input: String) -> String {
+        var result = ""
+        var hasDot = false
+        for scalar in input {
+            if scalar.isNumber {
+                result.append(scalar)
+            } else if (scalar == "." || scalar == ",") && !hasDot {
+                result.append(".")
+                hasDot = true
+            }
+        }
+        return result
+    }
+
+    private func formatted(_ number: Double) -> String {
+        let rounded = (number * 10).rounded() / 10
+        if rounded.truncatingRemainder(dividingBy: 1) == 0 {
+            return "\(Int(rounded))"
+        }
+        return String(format: "%.1f", rounded)
+    }
+}
+
+private struct EditableIntegerField: View {
+    @Binding var value: Int
+    let width: CGFloat
+
+    @State private var text: String = ""
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        TextField("0", text: $text)
+            .keyboardType(.numberPad)
+            .textFieldStyle(.plain)
+            .frame(width: width)
+            .focused($isFocused)
+            .onAppear {
+                text = "\(value)"
+            }
+            .onChange(of: value) { _, newValue in
+                guard !isFocused else { return }
+                text = "\(newValue)"
+            }
+            .onChange(of: text) { _, newText in
+                let digitsOnly = newText.filter(\.isNumber)
+                if digitsOnly != newText {
+                    text = digitsOnly
+                    return
+                }
+
+                guard !digitsOnly.isEmpty else { return }
+                if let parsed = Int(digitsOnly) {
+                    value = max(parsed, 0)
+                }
+            }
+            .onChange(of: isFocused) { _, focused in
+                if !focused {
+                    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmed.isEmpty {
+                        value = 0
+                        text = "0"
+                    } else if let parsed = Int(trimmed) {
+                        value = max(parsed, 0)
+                        text = "\(value)"
+                    }
+                }
+            }
     }
 }
 

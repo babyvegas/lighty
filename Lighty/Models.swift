@@ -126,3 +126,23 @@ struct CompletedTrainingExerciseSummary: Identifiable, Hashable, Codable {
         self.imageURL = imageURL
     }
 }
+
+struct ExercisePersonalRecord: Hashable {
+    var date: Date
+    var weight: Double
+    var reps: Int
+}
+
+struct ExerciseRecordSnapshot: Hashable {
+    var attemptsCount: Int
+    var bestWeight: Double
+    var bestReps: Int
+    var bestDate: Date?
+}
+
+struct CompletedSetRecord: Hashable {
+    var exerciseName: String
+    var weight: Double
+    var reps: Int
+    var completedAt: Date
+}

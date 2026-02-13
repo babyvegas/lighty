@@ -22,6 +22,7 @@ final class RoutineStore: ObservableObject {
                 WorkoutSetEntity.self,
                 RecentExerciseEntity.self,
                 TrainingSessionEntity.self,
+                ExerciseRecordEntity.self,
                 configurations: configuration
             )
             self.init(container: container)
@@ -83,6 +84,7 @@ final class RoutineStore: ObservableObject {
         date: Date = .now,
         durationSeconds: Int = 0,
         volume: Double = 0,
+        recordsCount: Int? = nil,
         exerciseSummaries: [CompletedTrainingExerciseSummary]? = nil
     ) {
         let summaries = exerciseSummaries ?? routine.exercises.map {
@@ -100,10 +102,92 @@ final class RoutineStore: ObservableObject {
             exerciseCount: routine.exercises.count,
             durationSeconds: durationSeconds,
             volume: volume,
+            recordsCount: recordsCount,
             exerciseSummaries: summaries
         )
         completedTrainings.insert(session, at: 0)
         persistTrainingSession(session)
+    }
+
+    func exerciseRecordSnapshot(for exerciseName: String) -> ExerciseRecordSnapshot {
+        let key = normalizedExerciseKey(exerciseName)
+        guard let entity = fetchExerciseRecordEntity(key: key) else {
+            return ExerciseRecordSnapshot(
+                attemptsCount: 0,
+                bestWeight: 0,
+                bestReps: 0,
+                bestDate: nil
+            )
+        }
+
+        return ExerciseRecordSnapshot(
+            attemptsCount: entity.attemptsCount,
+            bestWeight: entity.bestWeight,
+            bestReps: entity.bestReps,
+            bestDate: entity.bestAt
+        )
+    }
+
+    func bestPersonalRecord(for exerciseName: String) -> ExercisePersonalRecord? {
+        let key = normalizedExerciseKey(exerciseName)
+        guard let entity = fetchExerciseRecordEntity(key: key),
+              entity.attemptsCount > 0,
+              let bestAt = entity.bestAt,
+              entity.bestWeight > 0,
+              entity.bestReps > 0 else {
+            return nil
+        }
+
+        return ExercisePersonalRecord(
+            date: bestAt,
+            weight: entity.bestWeight,
+            reps: entity.bestReps
+        )
+    }
+
+    func persistCompletedSetRecords(_ records: [CompletedSetRecord]) -> Int {
+        guard !records.isEmpty else { return 0 }
+
+        var personalRecordsCount = 0
+
+        for record in records {
+            guard record.weight > 0, record.reps > 0 else { continue }
+
+            let key = normalizedExerciseKey(record.exerciseName)
+            let existingEntity = fetchExerciseRecordEntity(key: key)
+            let entity = existingEntity ?? ExerciseRecordEntity(
+                exerciseKey: key,
+                exerciseName: record.exerciseName
+            )
+
+            if existingEntity == nil {
+                context.insert(entity)
+            }
+
+            let hasHistory = entity.attemptsCount > 0
+            let becomesNewRecord = hasHistory && isBetterRecord(
+                weight: record.weight,
+                reps: record.reps,
+                thanWeight: entity.bestWeight,
+                reps: entity.bestReps
+            )
+
+            entity.attemptsCount += 1
+            entity.exerciseName = record.exerciseName
+
+            if entity.attemptsCount == 1 || becomesNewRecord {
+                entity.bestWeight = record.weight
+                entity.bestReps = record.reps
+                entity.bestAt = record.completedAt
+            }
+
+            if becomesNewRecord {
+                personalRecordsCount += 1
+            }
+        }
+
+        saveContext()
+        return personalRecordsCount
     }
 
     // MARK: - Persistence
@@ -261,6 +345,13 @@ final class RoutineStore: ObservableObject {
         return try? context.fetch(descriptor).first
     }
 
+    private func fetchExerciseRecordEntity(key: String) -> ExerciseRecordEntity? {
+        let descriptor = FetchDescriptor<ExerciseRecordEntity>(
+            predicate: #Predicate { $0.exerciseKey == key }
+        )
+        return try? context.fetch(descriptor).first
+    }
+
     private func saveContext() {
         do {
             try context.save()
@@ -366,5 +457,19 @@ final class RoutineStore: ObservableObject {
         } catch {
             return []
         }
+    }
+
+    private func normalizedExerciseKey(_ name: String) -> String {
+        name
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
+    private func isBetterRecord(weight candidateWeight: Double, reps candidateReps: Int, thanWeight bestWeight: Double, reps bestReps: Int) -> Bool {
+        let sameOrMoreReps = candidateReps >= bestReps
+        let sameOrMoreWeight = candidateWeight >= bestWeight
+        let improvesWeight = candidateWeight > bestWeight && sameOrMoreReps
+        let improvesReps = candidateReps > bestReps && sameOrMoreWeight
+        return improvesWeight || improvesReps
     }
 }

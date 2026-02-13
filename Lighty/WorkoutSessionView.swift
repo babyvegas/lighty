@@ -163,14 +163,24 @@ final class WorkoutSessionManager: ObservableObject {
 
         store.recordTraining(from: completedRoutine)
 
-        if updateRoutine, let sourceRoutineID {
-            let updatedRoutine = Routine(
-                id: sourceRoutineID,
-                name: title,
-                description: sourceRoutineDescription,
-                exercises: updatedExercises
-            )
-            store.save(updatedRoutine)
+        if let sourceRoutineID {
+            if updateRoutine {
+                let updatedRoutine = Routine(
+                    id: sourceRoutineID,
+                    name: title,
+                    description: sourceRoutineDescription,
+                    exercises: updatedExercises
+                )
+                store.save(updatedRoutine)
+            } else if let existingRoutine = store.routine(with: sourceRoutineID) {
+                // Persist performance history (lbs/reps) even when user decides
+                // not to apply structural routine changes.
+                let mergedRoutine = mergePerformanceHistory(
+                    from: existingRoutine,
+                    using: updatedExercises
+                )
+                store.save(mergedRoutine)
+            }
         }
 
         completionToast = buildCompletionToast(
@@ -181,6 +191,33 @@ final class WorkoutSessionManager: ObservableObject {
         )
 
         endSession()
+    }
+
+    private func mergePerformanceHistory(from source: Routine, using sessionExercises: [ExerciseEntry]) -> Routine {
+        let sessionMap = Dictionary(uniqueKeysWithValues: sessionExercises.map { ($0.id, $0) })
+
+        let mergedExercises = source.exercises.map { sourceExercise in
+            guard let sessionExercise = sessionMap[sourceExercise.id] else { return sourceExercise }
+            let sessionSetMap = Dictionary(uniqueKeysWithValues: sessionExercise.sets.map { ($0.id, $0) })
+
+            var mergedExercise = sourceExercise
+            mergedExercise.sets = sourceExercise.sets.map { sourceSet in
+                guard let sessionSet = sessionSetMap[sourceSet.id] else { return sourceSet }
+                return WorkoutSet(
+                    id: sourceSet.id,
+                    weight: sessionSet.weight,
+                    reps: sessionSet.reps
+                )
+            }
+            return mergedExercise
+        }
+
+        return Routine(
+            id: source.id,
+            name: source.name,
+            description: source.description,
+            exercises: mergedExercises
+        )
     }
 
     func clearCompletionToast() {
@@ -287,7 +324,15 @@ final class WorkoutSessionManager: ObservableObject {
 
     var hasRoutineChanges: Bool {
         guard canUpdateSourceRoutine else { return false }
-        return sourceRoutineExercises != exercises.map { $0.toExerciseEntry() }
+        let originalStructure = routineStructureSignature(from: sourceRoutineExercises)
+        let currentStructure = routineStructureSignature(from: exercises.map { $0.toExerciseEntry() })
+        return originalStructure != currentStructure
+    }
+
+    private func routineStructureSignature(from exercises: [ExerciseEntry]) -> [String] {
+        exercises.map { exercise in
+            "\(exercise.id.uuidString)#\(exercise.sets.count)"
+        }
     }
 
     private func endSession() {
@@ -516,6 +561,7 @@ struct WorkoutSessionView: View {
     @State private var restPickerExerciseIndex: Int?
     @State private var showFinishOptions = false
     @State private var lastRestSentWasActive = false
+    @State private var finishTriggeredFromWatch = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -645,14 +691,22 @@ struct WorkoutSessionView: View {
             titleVisibility: .visible
         ) {
                 Button("Guardar entreno y actualizar rutina") {
-                    notifyWatchFinished()
+                    if !finishTriggeredFromWatch {
+                        notifyWatchFinished()
+                    }
                     workoutSession.finish(using: store, updateRoutine: true)
+                    finishTriggeredFromWatch = false
                 }
                 Button("Guardar solo entreno") {
-                    notifyWatchFinished()
+                    if !finishTriggeredFromWatch {
+                        notifyWatchFinished()
+                    }
                     workoutSession.finish(using: store, updateRoutine: false)
+                    finishTriggeredFromWatch = false
                 }
-            Button("Cancelar", role: .cancel) {}
+            Button("Cancelar", role: .cancel) {
+                finishTriggeredFromWatch = false
+            }
         } message: {
             Text("Este entreno modificó la rutina. ¿Quieres guardar esos cambios en la rutina también?")
         }
@@ -736,12 +790,40 @@ struct WorkoutSessionView: View {
                 exerciseId: exerciseId
             )
         }
-        .onReceive(NotificationCenter.default.publisher(for: .watchSessionFinished)) { _ in
-            showFinishOptions = false
-            workoutSession.finish(using: store, updateRoutine: false)
+        .onReceive(NotificationCenter.default.publisher(for: .watchSessionFinished)) { notification in
+            Task { @MainActor in
+                if let userInfo = notification.userInfo,
+                   let exerciseIdString = userInfo["exerciseId"] as? String,
+                   let setIdString = userInfo["setId"] as? String,
+                   let exerciseId = UUID(uuidString: exerciseIdString),
+                   let setId = UUID(uuidString: setIdString) {
+                    let weight: Double = {
+                        if let value = userInfo["weight"] as? Double { return value }
+                        if let value = userInfo["weight"] as? Int { return Double(value) }
+                        return 0
+                    }()
+                    let reps = userInfo["reps"] as? Int ?? 0
+                    workoutSession.applyRemoteSetUpdate(
+                        exerciseId: exerciseId,
+                        setId: setId,
+                        weight: weight,
+                        reps: reps
+                    )
+                }
+                // Allow pending set_updated from watch to land before finishing.
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                finishTriggeredFromWatch = true
+                if workoutSession.hasRoutineChanges {
+                    showFinishOptions = true
+                } else {
+                    workoutSession.finish(using: store, updateRoutine: false)
+                    finishTriggeredFromWatch = false
+                }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .watchSessionDiscarded)) { _ in
             showFinishOptions = false
+            finishTriggeredFromWatch = false
             workoutSession.discard()
         }
         .onChange(of: workoutSession.restRemainingSeconds) { _, newValue in
@@ -780,6 +862,7 @@ struct WorkoutSessionView: View {
                 Spacer()
 
                 Button("Finish") {
+                    finishTriggeredFromWatch = false
                     if workoutSession.hasRoutineChanges {
                         showFinishOptions = true
                     } else {

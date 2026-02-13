@@ -340,11 +340,39 @@ struct ContentView: View {
             session.reset()
             return
         }
-        connectivity.sendSessionFinished(sessionId: session.sessionId)
-        session.reset()
-        restRemainingSeconds = nil
-        restExerciseName = ""
-        restExerciseId = nil
+        let sessionId = session.sessionId
+        let finalSetSnapshot: (exerciseId: String, setId: String, weight: Double, reps: Int)? = {
+            guard let exercise = currentExercise,
+                  exercise.sets.indices.contains(currentSetIndex) else {
+                return nil
+            }
+            let set = exercise.sets[currentSetIndex]
+            return (exercise.id, set.id, set.weight, set.reps)
+        }()
+
+        Task { @MainActor in
+            if let finalSetSnapshot {
+                connectivity.sendSetUpdate(
+                    sessionId: sessionId,
+                    exerciseId: finalSetSnapshot.exerciseId,
+                    setId: finalSetSnapshot.setId,
+                    weight: finalSetSnapshot.weight,
+                    reps: finalSetSnapshot.reps
+                )
+                try? await Task.sleep(nanoseconds: 180_000_000)
+                connectivity.sendSessionFinished(
+                    sessionId: sessionId,
+                    exerciseId: finalSetSnapshot.exerciseId,
+                    setId: finalSetSnapshot.setId,
+                    weight: finalSetSnapshot.weight,
+                    reps: finalSetSnapshot.reps
+                )
+            } else {
+                connectivity.sendSessionFinished(sessionId: sessionId)
+            }
+        }
+
+        resetLocalWorkoutState()
     }
 
     private func discardWorkout() {
@@ -353,10 +381,7 @@ struct ContentView: View {
             return
         }
         connectivity.sendSessionDiscarded(sessionId: session.sessionId)
-        session.reset()
-        restRemainingSeconds = nil
-        restExerciseName = ""
-        restExerciseId = nil
+        resetLocalWorkoutState()
     }
 
     private var syncColor: Color {
@@ -369,6 +394,16 @@ struct ContentView: View {
             return "\(Int(value))"
         }
         return String(format: "%.1f", value)
+    }
+
+    private func resetLocalWorkoutState() {
+        session.reset()
+        restRemainingSeconds = nil
+        restExerciseName = ""
+        restExerciseId = nil
+        shouldAdvanceAfterRest = false
+        currentExerciseIndex = 0
+        currentSetIndex = 0
     }
 }
 
@@ -480,8 +515,9 @@ private struct WatchActiveSetView: View {
             $crownValue,
             from: 0,
             through: selectedField == .weight ? 1000 : 200,
-            by: selectedField == .weight ? 0.5 : 1,
-            sensitivity: selectedField == .weight ? .medium : .low,
+            // Smaller crown steps make the interaction feel less jumpy.
+            by: selectedField == .weight ? 0.25 : 0.5,
+            sensitivity: .low,
             isContinuous: true,
             isHapticFeedbackEnabled: true
         )

@@ -189,15 +189,33 @@ final class WatchConnectivityCoordinator: NSObject, ObservableObject {
         }
     }
 
-    func sendSessionFinished(sessionId: String) {
+    func sendSessionFinished(
+        sessionId: String,
+        exerciseId: String? = nil,
+        setId: String? = nil,
+        weight: Double? = nil,
+        reps: Int? = nil
+    ) {
         guard let session else { return }
 
-        let payload: [String: Any] = [
+        var payload: [String: Any] = [
             "type": "session_finished",
             "origin": "watch",
             "sessionId": sessionId,
             "sentAt": Date().timeIntervalSince1970
         ]
+        if let exerciseId {
+            payload["exerciseId"] = exerciseId
+        }
+        if let setId {
+            payload["setId"] = setId
+        }
+        if let weight {
+            payload["weight"] = weight
+        }
+        if let reps {
+            payload["reps"] = reps
+        }
 
         if session.isReachable {
             session.sendMessage(payload, replyHandler: nil) { [weak self] error in

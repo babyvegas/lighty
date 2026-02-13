@@ -59,11 +59,11 @@ final class ExerciseEntity {
 @Model
 final class WorkoutSetEntity {
     var id: UUID
-    var weight: Int
+    var weight: Double
     var reps: Int
     var orderIndex: Int
 
-    init(id: UUID, weight: Int, reps: Int, orderIndex: Int) {
+    init(id: UUID, weight: Double, reps: Int, orderIndex: Int) {
         self.id = id
         self.weight = weight
         self.reps = reps

@@ -381,4 +381,5 @@ private struct ProfileView: View {
 #Preview {
     AppShellView()
         .environmentObject(RoutineStore())
+        .environmentObject(PhoneWatchConnectivityCoordinator())
 }

@@ -6,12 +6,47 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D10671B92F366B96002DCEBB /* LightyWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = D10671AF2F366B95002DCEBB /* LightyWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		D1B23DDA2F35BCAD00F3B2C3 /* Config.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = D1B23DD82F35BCAD00F3B2C3 /* Config.xcconfig */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D10671B72F366B96002DCEBB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D16039F32F355FCB00A84965 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D10671AE2F366B95002DCEBB;
+			remoteInfo = "LightyWatch Watch App";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D10671BA2F366B96002DCEBB /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				D10671B92F366B96002DCEBB /* LightyWatch Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		D10671AF2F366B95002DCEBB /* LightyWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "LightyWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D16039FB2F355FCB00A84965 /* Lighty.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lighty.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D1B23DD82F35BCAD00F3B2C3 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		D10671B02F366B95002DCEBB /* LightyWatch Watch App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "LightyWatch Watch App";
+			sourceTree = "<group>";
+		};
 		D16039FD2F355FCB00A84965 /* Lighty */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Lighty;
@@ -20,6 +55,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		D10671AC2F366B95002DCEBB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D16039F82F355FCB00A84965 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -34,6 +76,7 @@
 			isa = PBXGroup;
 			children = (
 				D16039FD2F355FCB00A84965 /* Lighty */,
+				D10671B02F366B95002DCEBB /* LightyWatch Watch App */,
 				D16039FC2F355FCB00A84965 /* Products */,
 				D1B23DD82F35BCAD00F3B2C3 /* Config.xcconfig */,
 			);
@@ -43,6 +86,7 @@
 			isa = PBXGroup;
 			children = (
 				D16039FB2F355FCB00A84965 /* Lighty.app */,
+				D10671AF2F366B95002DCEBB /* LightyWatch Watch App.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -50,6 +94,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		D10671AE2F366B95002DCEBB /* LightyWatch Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D10671BD2F366B96002DCEBB /* Build configuration list for PBXNativeTarget "LightyWatch Watch App" */;
+			buildPhases = (
+				D10671AB2F366B95002DCEBB /* Sources */,
+				D10671AC2F366B95002DCEBB /* Frameworks */,
+				D10671AD2F366B95002DCEBB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				D10671B02F366B95002DCEBB /* LightyWatch Watch App */,
+			);
+			name = "LightyWatch Watch App";
+			packageProductDependencies = (
+			);
+			productName = "LightyWatch Watch App";
+			productReference = D10671AF2F366B95002DCEBB /* LightyWatch Watch App.app */;
+			productType = "com.apple.product-type.application";
+		};
 		D16039FA2F355FCB00A84965 /* Lighty */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = D1603A062F355FCC00A84965 /* Build configuration list for PBXNativeTarget "Lighty" */;
@@ -57,10 +123,12 @@
 				D16039F72F355FCB00A84965 /* Sources */,
 				D16039F82F355FCB00A84965 /* Frameworks */,
 				D16039F92F355FCB00A84965 /* Resources */,
+				D10671BA2F366B96002DCEBB /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				D10671B82F366B96002DCEBB /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				D16039FD2F355FCB00A84965 /* Lighty */,
@@ -82,6 +150,9 @@
 				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
+					D10671AE2F366B95002DCEBB = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
 					D16039FA2F355FCB00A84965 = {
 						CreatedOnToolsVersion = 26.0.1;
 					};
@@ -102,21 +173,37 @@
 			projectRoot = "";
 			targets = (
 				D16039FA2F355FCB00A84965 /* Lighty */,
+				D10671AE2F366B95002DCEBB /* LightyWatch Watch App */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		D16039F92F355FCB00A84965 /* Resources */ = {
+		D10671AD2F366B95002DCEBB /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D16039F92F355FCB00A84965 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D1B23DDA2F35BCAD00F3B2C3 /* Config.xcconfig in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		D10671AB2F366B95002DCEBB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D16039F72F355FCB00A84965 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -126,7 +213,81 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		D10671B82F366B96002DCEBB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D10671AE2F366B95002DCEBB /* LightyWatch Watch App */;
+			targetProxy = D10671B72F366B96002DCEBB /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		D10671BB2F366B96002DCEBB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WKZR28KJT4;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = LightyWatch;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.donovandev.Lighty;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.donovandev.Lighty.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		D10671BC2F366B96002DCEBB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WKZR28KJT4;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = LightyWatch;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.donovandev.Lighty;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.donovandev.Lighty.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
 		D1603A042F355FCC00A84965 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = D1B23DD82F35BCAD00F3B2C3 /* Config.xcconfig */;
@@ -323,6 +484,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		D10671BD2F366B96002DCEBB /* Build configuration list for PBXNativeTarget "LightyWatch Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D10671BB2F366B96002DCEBB /* Debug */,
+				D10671BC2F366B96002DCEBB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		D16039F62F355FCB00A84965 /* Build configuration list for PBXProject "Lighty" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

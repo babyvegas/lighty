@@ -4,6 +4,7 @@ import SwiftUI
 @main
 struct LightyApp: App {
     @StateObject private var store: RoutineStore
+    @StateObject private var connectivity = PhoneWatchConnectivityCoordinator()
 
     init() {
         do {
@@ -24,6 +25,7 @@ struct LightyApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(store)
+                .environmentObject(connectivity)
         }
     }
 }

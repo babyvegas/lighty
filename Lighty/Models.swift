@@ -2,15 +2,45 @@ import Foundation
 
 // MARK: - Models
 
+enum WorkoutSetType: String, Codable, CaseIterable, Hashable {
+    case normal
+    case warmup
+    case failure
+
+    var shortLabel: String {
+        switch self {
+        case .normal:
+            return ""
+        case .warmup:
+            return "W"
+        case .failure:
+            return "F"
+        }
+    }
+
+    var menuTitle: String {
+        switch self {
+        case .normal:
+            return "Serie Normal"
+        case .warmup:
+            return "W (Calentamiento)"
+        case .failure:
+            return "F (Fallo)"
+        }
+    }
+}
+
 struct WorkoutSet: Identifiable, Hashable {
     let id: UUID
     var weight: Double
     var reps: Int
+    var type: WorkoutSetType
 
-    init(id: UUID = UUID(), weight: Double = 0, reps: Int = 0) {
+    init(id: UUID = UUID(), weight: Double = 0, reps: Int = 0, type: WorkoutSetType = .normal) {
         self.id = id
         self.weight = weight
         self.reps = reps
+        self.type = type
     }
 }
 

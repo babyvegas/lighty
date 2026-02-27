@@ -164,10 +164,16 @@ final class WatchConnectivityCoordinator: NSObject, ObservableObject {
         }
     }
 
-    func sendRestAdjustment(sessionId: String, exerciseId: String, remainingSeconds: Int, exerciseName: String) {
+    func sendRestAdjustment(
+        sessionId: String,
+        exerciseId: String,
+        remainingSeconds: Int,
+        endsAt: TimeInterval? = nil,
+        exerciseName: String
+    ) {
         guard let session else { return }
 
-        let payload: [String: Any] = [
+        var payload: [String: Any] = [
             "type": "rest_adjusted",
             "origin": "watch",
             "sessionId": sessionId,
@@ -176,6 +182,11 @@ final class WatchConnectivityCoordinator: NSObject, ObservableObject {
             "remainingSeconds": remainingSeconds,
             "sentAt": Date().timeIntervalSince1970
         ]
+        if let endsAt {
+            payload["endsAt"] = endsAt
+        } else if remainingSeconds > 0 {
+            payload["endsAt"] = Date().timeIntervalSince1970 + Double(remainingSeconds)
+        }
 
         if session.isReachable {
             session.sendMessage(payload, replyHandler: nil) { [weak self] error in

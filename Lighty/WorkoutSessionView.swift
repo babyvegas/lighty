@@ -15,6 +15,7 @@ struct WorkoutSessionSet: Identifiable, Hashable {
     var lastReps: Int
     var weight: Double
     var reps: Int
+    var type: WorkoutSetType
     var isCompleted: Bool
 
     init(
@@ -23,6 +24,7 @@ struct WorkoutSessionSet: Identifiable, Hashable {
         lastReps: Int = 0,
         weight: Double = 0,
         reps: Int = 0,
+        type: WorkoutSetType = .normal,
         isCompleted: Bool = false
     ) {
         self.id = id
@@ -30,6 +32,7 @@ struct WorkoutSessionSet: Identifiable, Hashable {
         self.lastReps = lastReps
         self.weight = weight
         self.reps = reps
+        self.type = type
         self.isCompleted = isCompleted
     }
 
@@ -39,6 +42,7 @@ struct WorkoutSessionSet: Identifiable, Hashable {
         lastReps = set.reps
         weight = set.weight
         reps = set.reps
+        type = set.type
         isCompleted = false
     }
 }
@@ -87,7 +91,7 @@ struct WorkoutSessionExercise: Identifiable, Hashable {
             mediaURL: mediaURL,
             primaryMuscle: primaryMuscle,
             secondaryMuscles: secondaryMuscles,
-            sets: sets.map { WorkoutSet(id: $0.id, weight: $0.weight, reps: $0.reps) },
+            sets: sets.map { WorkoutSet(id: $0.id, weight: $0.weight, reps: $0.reps, type: $0.type) },
             restMinutes: restMinutes
         )
     }
@@ -114,6 +118,7 @@ final class WorkoutSessionManager: ObservableObject {
     private var startedAt: Date?
     private var elapsedTicker: AnyCancellable?
     private var restTicker: AnyCancellable?
+    private var restEndsAt: Date?
     private var liveRecordStates: [String: ExerciseRecordSnapshot] = [:]
     private var completedSetTracking: Set<UUID> = []
 
@@ -226,7 +231,8 @@ final class WorkoutSessionManager: ObservableObject {
                 return WorkoutSet(
                     id: sourceSet.id,
                     weight: sessionSet.weight,
-                    reps: sessionSet.reps
+                    reps: sessionSet.reps,
+                    type: sourceSet.type
                 )
             }
             return mergedExercise
@@ -263,6 +269,19 @@ final class WorkoutSessionManager: ObservableObject {
 
         var updated = exercises
         updated[exerciseIndex].sets.append(WorkoutSessionSet())
+        exercises = updated
+    }
+
+    func deleteSet(exerciseIndex: Int, setIndex: Int) {
+        guard exercises.indices.contains(exerciseIndex),
+              exercises[exerciseIndex].sets.indices.contains(setIndex),
+              exercises[exerciseIndex].sets.count > 1 else {
+            return
+        }
+
+        var updated = exercises
+        let removedSet = updated[exerciseIndex].sets.remove(at: setIndex)
+        completedSetTracking.remove(removedSet.id)
         exercises = updated
     }
 
@@ -303,18 +322,34 @@ final class WorkoutSessionManager: ObservableObject {
     }
 
     func addRest(seconds: Int) {
-        let current = restRemainingSeconds ?? 0
-        let next = max(current + seconds, 0)
-        restRemainingSeconds = next == 0 ? nil : next
-        if next == 0 {
-            restTicker?.cancel()
-        } else if restTicker == nil {
+        guard seconds != 0 else { return }
+
+        let baseEndDate: Date = {
+            if let restEndsAt {
+                return restEndsAt
+            }
+            if let restRemainingSeconds {
+                return Date().addingTimeInterval(Double(restRemainingSeconds))
+            }
+            return Date()
+        }()
+
+        let updatedEndDate = baseEndDate.addingTimeInterval(TimeInterval(seconds))
+        guard updatedEndDate.timeIntervalSinceNow > 0 else {
+            skipRest()
+            return
+        }
+
+        restEndsAt = updatedEndDate
+        syncRestCountdownFromEndDate()
+        if restTicker == nil {
             startRestTimer()
         }
     }
 
     func skipRest() {
         restRemainingSeconds = nil
+        restEndsAt = nil
         restExerciseName = ""
         restExerciseId = nil
         restTicker?.cancel()
@@ -348,6 +383,10 @@ final class WorkoutSessionManager: ObservableObject {
         return "\(minutes):\(String(format: "%02d", seconds))"
     }
 
+    var restEndsAtTimestamp: TimeInterval? {
+        restEndsAt?.timeIntervalSince1970
+    }
+
     var canUpdateSourceRoutine: Bool {
         sourceRoutineID != nil
     }
@@ -375,6 +414,7 @@ final class WorkoutSessionManager: ObservableObject {
         exercises = []
         elapsedSeconds = 0
         restRemainingSeconds = nil
+        restEndsAt = nil
         restExerciseName = ""
         restExerciseId = nil
         startedAt = nil
@@ -397,6 +437,7 @@ final class WorkoutSessionManager: ObservableObject {
         startedAt = .now
         elapsedSeconds = 0
         restRemainingSeconds = nil
+        restEndsAt = nil
         restExerciseName = ""
         restExerciseId = nil
         personalRecordToast = nil
@@ -417,6 +458,7 @@ final class WorkoutSessionManager: ObservableObject {
                         "id": set.id.uuidString,
                         "weight": set.weight,
                         "reps": set.reps,
+                        "type": set.type.rawValue,
                         "isCompleted": set.isCompleted,
                         "lastWeight": set.lastWeight,
                         "lastReps": set.lastReps
@@ -425,7 +467,7 @@ final class WorkoutSessionManager: ObservableObject {
             ]
         }
 
-        return [
+        var payload: [String: Any] = [
             "type": "session_snapshot",
             "origin": "iphone",
             "sessionId": sessionId,
@@ -433,6 +475,20 @@ final class WorkoutSessionManager: ObservableObject {
             "exercises": exercisePayload,
             "sentAt": Date().timeIntervalSince1970
         ]
+
+        if let restEndsAt {
+            let remainingSeconds = max(Int(ceil(restEndsAt.timeIntervalSinceNow)), 0)
+            if remainingSeconds > 0 {
+                payload["rest"] = [
+                    "remainingSeconds": remainingSeconds,
+                    "exerciseName": restExerciseName,
+                    "exerciseId": restExerciseId?.uuidString ?? "",
+                    "endsAt": restEndsAt.timeIntervalSince1970
+                ]
+            }
+        }
+
+        return payload
     }
 
     func applyRemoteSetToggle(exerciseId: UUID, setId: UUID, isCompleted: Bool, store: RoutineStore? = nil) {
@@ -494,13 +550,29 @@ final class WorkoutSessionManager: ObservableObject {
         exercises = updated
     }
 
-    func applyRemoteRestAdjustment(remainingSeconds: Int, exerciseName: String?, exerciseId: UUID?) {
-        guard remainingSeconds > 0 else {
+    func applyRemoteRestAdjustment(
+        remainingSeconds: Int,
+        endsAt: TimeInterval?,
+        exerciseName: String?,
+        exerciseId: UUID?
+    ) {
+        let resolvedEndDate: Date? = {
+            if let endsAt {
+                return Date(timeIntervalSince1970: endsAt)
+            }
+            guard remainingSeconds > 0 else { return nil }
+            return Date().addingTimeInterval(Double(remainingSeconds))
+        }()
+
+        let resolvedRemainingSeconds = max(Int(ceil((resolvedEndDate?.timeIntervalSinceNow ?? 0))), 0)
+
+        guard resolvedRemainingSeconds > 0 else {
             skipRest()
             return
         }
 
-        restRemainingSeconds = remainingSeconds
+        restEndsAt = resolvedEndDate
+        restRemainingSeconds = resolvedRemainingSeconds
         if let exerciseName, !exerciseName.isEmpty {
             restExerciseName = exerciseName
         }
@@ -536,22 +608,30 @@ final class WorkoutSessionManager: ObservableObject {
 
         restExerciseName = exerciseName
         restExerciseId = exerciseId
-        restRemainingSeconds = seconds
+        restEndsAt = Date().addingTimeInterval(TimeInterval(seconds))
+        syncRestCountdownFromEndDate()
         startRestTimer()
     }
 
     private func startRestTimer() {
         restTicker?.cancel()
-        restTicker = Timer.publish(every: 1, on: .main, in: .common)
+        restTicker = Timer.publish(every: 0.25, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
-                guard let self, let remaining = self.restRemainingSeconds else { return }
-                if remaining <= 1 {
-                    self.skipRest()
-                } else {
-                    self.restRemainingSeconds = remaining - 1
-                }
+                self?.syncRestCountdownFromEndDate()
             }
+    }
+
+    private func syncRestCountdownFromEndDate() {
+        guard let restEndsAt else { return }
+        let remaining = Int(ceil(restEndsAt.timeIntervalSinceNow))
+        guard remaining > 0 else {
+            skipRest()
+            return
+        }
+        if restRemainingSeconds != remaining {
+            restRemainingSeconds = remaining
+        }
     }
 
     private func stopTimers() {
@@ -767,12 +847,18 @@ struct WorkoutSessionView: View {
         }
         .onAppear {
             syncSessionSnapshot()
+            if let remaining = workoutSession.restRemainingSeconds {
+                sendRestToWatch(remainingSeconds: remaining)
+            }
         }
         .onChange(of: connectivity.isWatchAppInstalled) { _, _ in
             syncSessionSnapshot()
         }
         .onChange(of: connectivity.isReachable) { _, _ in
             syncSessionSnapshot()
+            if let remaining = workoutSession.restRemainingSeconds {
+                sendRestToWatch(remainingSeconds: remaining)
+            }
         }
         .sheet(isPresented: $showExercisePicker) {
             AddExerciseCatalogView { selected in
@@ -907,6 +993,11 @@ struct WorkoutSessionView: View {
                   let remainingSeconds = userInfo["remainingSeconds"] as? Int else {
                 return
             }
+            let endsAt: TimeInterval? = {
+                if let value = userInfo["endsAt"] as? Double { return value }
+                if let value = userInfo["endsAt"] as? Int { return TimeInterval(value) }
+                return nil
+            }()
             let exerciseName = userInfo["exerciseName"] as? String
             let exerciseId: UUID? = {
                 if let idString = userInfo["exerciseId"] as? String {
@@ -916,6 +1007,7 @@ struct WorkoutSessionView: View {
             }()
             workoutSession.applyRemoteRestAdjustment(
                 remainingSeconds: remainingSeconds,
+                endsAt: endsAt,
                 exerciseName: exerciseName,
                 exerciseId: exerciseId
             )
@@ -988,6 +1080,7 @@ struct WorkoutSessionView: View {
         .onDisappear {
             prToastDismissTask?.cancel()
         }
+        .dismissKeyboardOnTap()
         .interactiveDismissDisabled()
     }
 
@@ -1106,9 +1199,34 @@ struct WorkoutSessionView: View {
             ForEach(exercise.sets.indices, id: \.self) { setIndex in
                 let set = workoutSession.exercises[exerciseIndex].sets[setIndex]
                 HStack(spacing: 10) {
-                    Text("\(setIndex + 1)")
-                        .frame(width: 30, alignment: .leading)
-                        .foregroundStyle(StyleKit.softInk)
+                    Menu {
+                        ForEach(WorkoutSetType.allCases, id: \.self) { type in
+                            Button {
+                                workoutSession.exercises[exerciseIndex].sets[setIndex].type = type
+                                syncSessionSnapshot()
+                            } label: {
+                                if set.type == type {
+                                    Label(type.menuTitle, systemImage: "checkmark")
+                                } else {
+                                    Text(type.menuTitle)
+                                }
+                            }
+                        }
+                        Divider()
+                        Button(role: .destructive) {
+                            workoutSession.deleteSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
+                            syncSessionSnapshot()
+                        } label: {
+                            Text("Delete Set")
+                        }
+                        .disabled(workoutSession.exercises[exerciseIndex].sets.count <= 1)
+                    } label: {
+                        Text(setDisplayLabel(for: exercise.sets, at: setIndex))
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(StyleKit.accentBlue)
+                            .frame(width: 30, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
 
                     Text(lastSetLabel(set))
                         .font(.caption.weight(.semibold))
@@ -1148,6 +1266,14 @@ struct WorkoutSessionView: View {
                 .padding(.horizontal, 10)
                 .background(setIndex.isMultiple(of: 2) ? Color.white.opacity(0.46) : StyleKit.softChip.opacity(0.72))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        workoutSession.deleteSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
+                        syncSessionSnapshot()
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
             }
 
             Button {
@@ -1193,6 +1319,29 @@ struct WorkoutSessionView: View {
                 .font(.caption.weight(.bold))
                 .foregroundStyle(StyleKit.softInk)
         }
+    }
+
+    private func setDisplayLabel(for sets: [WorkoutSessionSet], at index: Int) -> String {
+        guard sets.indices.contains(index) else { return "-" }
+        let type = sets[index].type
+        switch type {
+        case .warmup:
+            return "W"
+        case .failure:
+            return "F"
+        case .normal:
+            return "\(normalSetOrdinal(for: sets, at: index))"
+        }
+    }
+
+    private func normalSetOrdinal(for sets: [WorkoutSessionSet], at index: Int) -> Int {
+        var ordinal = 0
+        for position in sets.indices where position <= index {
+            if sets[position].type == .normal {
+                ordinal += 1
+            }
+        }
+        return max(ordinal, 1)
     }
 
     private var watchSyncIndicator: some View {
@@ -1336,10 +1485,12 @@ struct WorkoutSessionView: View {
         guard let sessionId = workoutSession.sessionID?.uuidString else { return }
         guard connectivity.isWatchAppInstalled else { return }
         guard let exerciseId = workoutSession.restExerciseId?.uuidString else { return }
+        let endsAt = workoutSession.restEndsAtTimestamp ?? (Date().timeIntervalSince1970 + Double(remainingSeconds))
         connectivity.sendRestAdjustment(
             sessionId: sessionId,
             exerciseId: exerciseId,
             remainingSeconds: remainingSeconds,
+            endsAt: endsAt,
             exerciseName: workoutSession.restExerciseName
         )
     }

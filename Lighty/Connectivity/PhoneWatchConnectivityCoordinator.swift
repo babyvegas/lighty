@@ -127,11 +127,17 @@ final class PhoneWatchConnectivityCoordinator: NSObject, ObservableObject {
         }
     }
 
-    func sendRestAdjustment(sessionId: String, exerciseId: String, remainingSeconds: Int, exerciseName: String) {
+    func sendRestAdjustment(
+        sessionId: String,
+        exerciseId: String,
+        remainingSeconds: Int,
+        endsAt: TimeInterval?,
+        exerciseName: String
+    ) {
         guard let session else { return }
         guard session.isPaired, session.isWatchAppInstalled else { return }
 
-        let payload: [String: Any] = [
+        var payload: [String: Any] = [
             "type": "rest_adjusted",
             "origin": "iphone",
             "sessionId": sessionId,
@@ -140,6 +146,9 @@ final class PhoneWatchConnectivityCoordinator: NSObject, ObservableObject {
             "remainingSeconds": remainingSeconds,
             "sentAt": Date().timeIntervalSince1970
         ]
+        if let endsAt {
+            payload["endsAt"] = endsAt
+        }
 
         if session.isReachable {
             session.sendMessage(payload, replyHandler: nil) { [weak self] error in

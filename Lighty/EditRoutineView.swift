@@ -83,9 +83,33 @@ struct EditRoutineView: View {
 
                             ForEach(exercise.sets.indices, id: \.self) { index in
                                 HStack(spacing: 12) {
-                                    Text("\(index + 1)")
-                                        .frame(width: 30, alignment: .leading)
-                                        .foregroundStyle(StyleKit.softInk)
+                                    Menu {
+                                        ForEach(WorkoutSetType.allCases, id: \.self) { type in
+                                            Button {
+                                                exercise.sets[index].type = type
+                                            } label: {
+                                                if exercise.sets[index].type == type {
+                                                    Label(type.menuTitle, systemImage: "checkmark")
+                                                } else {
+                                                    Text(type.menuTitle)
+                                                }
+                                            }
+                                        }
+                                        Divider()
+                                        Button(role: .destructive) {
+                                            guard exercise.sets.indices.contains(index), exercise.sets.count > 1 else { return }
+                                            exercise.sets.remove(at: index)
+                                        } label: {
+                                            Text("Delete Set")
+                                        }
+                                        .disabled(exercise.sets.count <= 1)
+                                    } label: {
+                                        Text(setDisplayLabel(for: exercise.sets, at: index))
+                                            .font(.caption.weight(.bold))
+                                            .foregroundStyle(StyleKit.accentBlue)
+                                            .frame(width: 30, alignment: .leading)
+                                    }
+                                    .buttonStyle(.plain)
 
                                     TextField(
                                         "0",
@@ -105,6 +129,14 @@ struct EditRoutineView: View {
                                 .padding(.horizontal, 10)
                                 .background(index.isMultiple(of: 2) ? Color.white.opacity(0.42) : StyleKit.softChip.opacity(0.75))
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        guard exercise.sets.indices.contains(index), exercise.sets.count > 1 else { return }
+                                        exercise.sets.remove(at: index)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
                             }
 
                             Button {
@@ -140,6 +172,7 @@ struct EditRoutineView: View {
         }
         .background(Color.clear)
         .navigationBarHidden(true)
+        .dismissKeyboardOnTap()
         .onAppear {
             if let existing = store.routine(with: routineID) {
                 routine = existing
@@ -270,6 +303,29 @@ struct EditRoutineView: View {
             get: { routine.exercises[index] },
             set: { routine.exercises[index] = $0 }
         )
+    }
+
+    private func setDisplayLabel(for sets: [WorkoutSet], at index: Int) -> String {
+        guard sets.indices.contains(index) else { return "-" }
+        let type = sets[index].type
+        switch type {
+        case .warmup:
+            return "W"
+        case .failure:
+            return "F"
+        case .normal:
+            return "\(normalSetOrdinal(for: sets, at: index))"
+        }
+    }
+
+    private func normalSetOrdinal(for sets: [WorkoutSet], at index: Int) -> Int {
+        var ordinal = 0
+        for position in sets.indices where position <= index {
+            if sets[position].type == .normal {
+                ordinal += 1
+            }
+        }
+        return max(ordinal, 1)
     }
 }
 

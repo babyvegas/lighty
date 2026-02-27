@@ -13,12 +13,14 @@ struct ContentView: View {
     @StateObject private var session = WatchWorkoutSessionManager()
 
     @State private var restRemainingSeconds: Int?
+    @State private var restEndsAt: Date?
     @State private var restExerciseName = ""
     @State private var restExerciseId: String?
     @State private var shouldAdvanceAfterRest = false
 
     @State private var currentExerciseIndex = 0
     @State private var currentSetIndex = 0
+    @State private var restSyncTicker = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
     var body: some View {
         Group {
@@ -30,50 +32,49 @@ struct ContentView: View {
         }
         .onReceive(connectivity.$lastSessionPayload.compactMap { $0 }) { payload in
             session.applySnapshot(payload)
+            applyRestFromSessionSnapshot(payload)
             normalizeIndices()
         }
         .onReceive(connectivity.$lastRestPayload.compactMap { $0 }) { payload in
-            guard let seconds = payload["remainingSeconds"] as? Int else { return }
-            let name = payload["exerciseName"] as? String ?? ""
-            let exerciseId = payload["exerciseId"] as? String
-            if seconds <= 0 {
-                restRemainingSeconds = nil
-                restExerciseName = ""
-                restExerciseId = nil
-            } else {
-                restRemainingSeconds = seconds
-                restExerciseName = name
-                restExerciseId = exerciseId
-            }
+            applyIncomingRestPayload(payload)
         }
         .onReceive(connectivity.$didReceiveSessionFinished) { finished in
             guard finished else { return }
             session.reset()
             restRemainingSeconds = nil
+            restEndsAt = nil
             restExerciseName = ""
             restExerciseId = nil
+            shouldAdvanceAfterRest = false
             connectivity.didReceiveSessionFinished = false
         }
         .onReceive(connectivity.$didReceiveSessionDiscarded) { discarded in
             guard discarded else { return }
             session.reset()
             restRemainingSeconds = nil
+            restEndsAt = nil
             restExerciseName = ""
             restExerciseId = nil
+            shouldAdvanceAfterRest = false
             connectivity.didReceiveSessionDiscarded = false
+        }
+        .onReceive(restSyncTicker) { _ in
+            updateRestCountdownFromEndDate()
         }
         .fullScreenCover(
             isPresented: Binding(
                 get: { restRemainingSeconds != nil },
-                set: { if !$0 { restRemainingSeconds = nil } }
+                set: {
+                    if !$0 {
+                        restRemainingSeconds = nil
+                        restEndsAt = nil
+                    }
+                }
             )
         ) {
             WatchRestCountdownView(
                 exerciseName: restExerciseName,
-                remainingSeconds: Binding(
-                    get: { restRemainingSeconds ?? 0 },
-                    set: { restRemainingSeconds = $0 }
-                ),
+                remainingSeconds: restRemainingSeconds ?? 0,
                 onAdjust: { delta in
                     adjustRest(by: delta)
                 },
@@ -221,6 +222,63 @@ struct ContentView: View {
         }
     }
 
+    private func applyRestFromSessionSnapshot(_ payload: [String: Any]) {
+        guard let restPayload = payload["rest"] as? [String: Any] else {
+            applyIncomingRestPayload(["remainingSeconds": 0])
+            return
+        }
+        applyIncomingRestPayload(restPayload)
+    }
+
+    private func applyIncomingRestPayload(_ payload: [String: Any]) {
+        let resolvedSeconds = resolvedRestSeconds(from: payload)
+        let resolvedEndDate = resolvedRestEndDate(from: payload, fallbackSeconds: resolvedSeconds)
+        let name = payload["exerciseName"] as? String ?? ""
+        let exerciseId: String? = {
+            guard let raw = payload["exerciseId"] as? String, !raw.isEmpty else { return nil }
+            return raw
+        }()
+        if resolvedSeconds <= 0 {
+            completeRestLocally()
+            return
+        }
+
+        shouldAdvanceAfterRest = true
+        restEndsAt = resolvedEndDate
+        restRemainingSeconds = resolvedSeconds
+        restExerciseName = name
+        restExerciseId = exerciseId
+    }
+
+    private func resolvedRestSeconds(from payload: [String: Any]) -> Int {
+        let rawRemaining: Int = {
+            if let value = payload["remainingSeconds"] as? Int { return value }
+            if let value = payload["remainingSeconds"] as? Double { return Int(value.rounded()) }
+            return 0
+        }()
+
+        let endsAt: TimeInterval? = {
+            if let value = payload["endsAt"] as? Double { return value }
+            if let value = payload["endsAt"] as? Int { return TimeInterval(value) }
+            return nil
+        }()
+
+        guard let endsAt else { return rawRemaining }
+        let delta = Int((endsAt - Date().timeIntervalSince1970).rounded(.up))
+        return max(delta, 0)
+    }
+
+    private func resolvedRestEndDate(from payload: [String: Any], fallbackSeconds: Int) -> Date? {
+        if let endsAt = payload["endsAt"] as? Double {
+            return Date(timeIntervalSince1970: endsAt)
+        }
+        if let endsAt = payload["endsAt"] as? Int {
+            return Date(timeIntervalSince1970: TimeInterval(endsAt))
+        }
+        guard fallbackSeconds > 0 else { return nil }
+        return Date().addingTimeInterval(Double(fallbackSeconds))
+    }
+
     private func goToNextSet() {
         guard let exercise = currentExercise else { return }
         if currentSetIndex + 1 < exercise.sets.count {
@@ -284,6 +342,7 @@ struct ContentView: View {
         guard seconds > 0 else { return }
         restExerciseId = exercise.id
         restExerciseName = exercise.name
+        restEndsAt = Date().addingTimeInterval(Double(seconds))
         restRemainingSeconds = seconds
     }
 
@@ -298,21 +357,48 @@ struct ContentView: View {
         }
     }
 
+    private func updateRestCountdownFromEndDate() {
+        guard let restEndsAt else { return }
+        let remaining = Int(ceil(restEndsAt.timeIntervalSinceNow))
+        guard remaining > 0 else {
+            completeRestLocally()
+            return
+        }
+        if restRemainingSeconds != remaining {
+            restRemainingSeconds = remaining
+        }
+    }
+
+    private func completeRestLocally() {
+        let shouldAdvance = shouldAdvanceAfterRest
+        restRemainingSeconds = nil
+        restEndsAt = nil
+        restExerciseName = ""
+        restExerciseId = nil
+        if shouldAdvance {
+            shouldAdvanceAfterRest = false
+            goToNextSet()
+        }
+    }
+
     private func adjustRest(by delta: Int) {
         guard let current = restRemainingSeconds else { return }
-        let updated = max(current + delta, 0)
-        if updated == 0 {
+        let baseEndDate = restEndsAt ?? Date().addingTimeInterval(Double(current))
+        let updatedEndDate = baseEndDate.addingTimeInterval(Double(delta))
+        guard updatedEndDate.timeIntervalSinceNow > 0 else {
             skipRest()
             return
         }
-        restRemainingSeconds = updated
-        sendRestAdjustment(seconds: updated)
+        restEndsAt = updatedEndDate
+        updateRestCountdownFromEndDate()
+        sendRestAdjustment(seconds: restRemainingSeconds ?? 0, endsAt: updatedEndDate.timeIntervalSince1970)
     }
 
     private func skipRest() {
         let hadRest = restRemainingSeconds != nil
         let exerciseId = restExerciseId
         restRemainingSeconds = nil
+        restEndsAt = nil
         restExerciseName = ""
         if shouldAdvanceAfterRest {
             shouldAdvanceAfterRest = false
@@ -324,13 +410,14 @@ struct ContentView: View {
         restExerciseId = nil
     }
 
-    private func sendRestAdjustment(seconds: Int, exerciseId: String? = nil) {
+    private func sendRestAdjustment(seconds: Int, endsAt: TimeInterval? = nil, exerciseId: String? = nil) {
         guard !session.sessionId.isEmpty else { return }
         guard let resolvedExerciseId = exerciseId ?? restExerciseId else { return }
         connectivity.sendRestAdjustment(
             sessionId: session.sessionId,
             exerciseId: resolvedExerciseId,
             remainingSeconds: seconds,
+            endsAt: endsAt,
             exerciseName: restExerciseName
         )
     }
@@ -399,6 +486,7 @@ struct ContentView: View {
     private func resetLocalWorkoutState() {
         session.reset()
         restRemainingSeconds = nil
+        restEndsAt = nil
         restExerciseName = ""
         restExerciseId = nil
         shouldAdvanceAfterRest = false
@@ -515,9 +603,8 @@ private struct WatchActiveSetView: View {
             $crownValue,
             from: 0,
             through: selectedField == .weight ? 1000 : 200,
-            // Smaller crown steps make the interaction feel less jumpy.
-            by: selectedField == .weight ? 0.25 : 0.5,
-            sensitivity: .low,
+            by: selectedField == .weight ? 0.5 : 1,
+            sensitivity: .high,
             isContinuous: true,
             isHapticFeedbackEnabled: true
         )
@@ -605,11 +692,9 @@ private struct WatchActiveSetView: View {
 
 private struct WatchRestCountdownView: View {
     let exerciseName: String
-    @Binding var remainingSeconds: Int
+    let remainingSeconds: Int
     let onAdjust: (Int) -> Void
     let onSkip: () -> Void
-
-    @State private var ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(spacing: 12) {
@@ -633,13 +718,6 @@ private struct WatchRestCountdownView: View {
                 .frame(maxWidth: .infinity)
         }
         .padding()
-        .onReceive(ticker) { _ in
-            if remainingSeconds <= 1 {
-                onSkip()
-            } else {
-                remainingSeconds -= 1
-            }
-        }
     }
 
     private var restLabel: String {

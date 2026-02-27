@@ -37,8 +37,13 @@ struct RoutineDetailView: View {
                         .appCard(padding: 14, radius: 14)
                 }
 
-                ForEach($routine.exercises) { $exercise in
-                    ExerciseEditorView(exercise: $exercise)
+                ForEach(routine.exercises.indices, id: \.self) { index in
+                    ExerciseEditorView(
+                        exercise: $routine.exercises[index],
+                        onDeleteExercise: {
+                            routine.exercises.remove(at: index)
+                        }
+                    )
                 }
 
                 Button {
@@ -79,6 +84,7 @@ struct RoutineDetailView: View {
                 routine = existing
             }
         }
+        .dismissKeyboardOnTap()
     }
 
     private var routineHeader: some View {
@@ -117,22 +123,34 @@ struct RoutineDetailView: View {
 
 private struct ExerciseEditorView: View {
     @Binding var exercise: ExerciseEntry
+    let onDeleteExercise: () -> Void
     @State private var showRestPicker = false
     @State private var showInsights = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Button {
-                showInsights = true
-            } label: {
-                HStack(spacing: 8) {
-                    ExerciseRowThumbnail(imageURL: exercise.imageURL)
-                    Text(exercise.name)
-                        .font(.headline)
-                        .foregroundStyle(StyleKit.accentBlue)
+            HStack {
+                Button {
+                    showInsights = true
+                } label: {
+                    HStack(spacing: 8) {
+                        ExerciseRowThumbnail(imageURL: exercise.imageURL)
+                        Text(exercise.name)
+                            .font(.headline)
+                            .foregroundStyle(StyleKit.accentBlue)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Button(role: .destructive) {
+                    onDeleteExercise()
+                } label: {
+                    Image(systemName: "trash")
+                        .foregroundStyle(Color.red)
                 }
             }
-            .buttonStyle(.plain)
 
             TextField("Write your notes here", text: $exercise.notes, axis: .vertical)
                 .lineLimit(3, reservesSpace: true)
@@ -152,9 +170,32 @@ private struct ExerciseEditorView: View {
 
             ForEach(exercise.sets.indices, id: \.self) { index in
                 HStack(spacing: 12) {
-                    Text("\(index + 1)")
-                        .frame(width: 30, alignment: .leading)
-                        .foregroundStyle(StyleKit.softInk)
+                    Menu {
+                        ForEach(WorkoutSetType.allCases, id: \.self) { type in
+                            Button {
+                                exercise.sets[index].type = type
+                            } label: {
+                                if exercise.sets[index].type == type {
+                                    Label(type.menuTitle, systemImage: "checkmark")
+                                } else {
+                                    Text(type.menuTitle)
+                                }
+                            }
+                        }
+                        Divider()
+                        Button(role: .destructive) {
+                            deleteSet(at: index)
+                        } label: {
+                            Text("Delete Set")
+                        }
+                        .disabled(exercise.sets.count <= 1)
+                    } label: {
+                        Text(setDisplayLabel(at: index))
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(StyleKit.accentBlue)
+                            .frame(width: 30, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
 
                     TextField(
                         "0",
@@ -174,6 +215,13 @@ private struct ExerciseEditorView: View {
                 .padding(.vertical, 8)
                 .background(index.isMultiple(of: 2) ? Color.white.opacity(0.42) : StyleKit.softChip.opacity(0.75))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        deleteSet(at: index)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
             }
 
             Button {
@@ -221,6 +269,34 @@ private struct ExerciseEditorView: View {
                 .frame(width: 80, alignment: .leading)
         }
     }
+
+    private func setDisplayLabel(at index: Int) -> String {
+        guard exercise.sets.indices.contains(index) else { return "-" }
+        let type = exercise.sets[index].type
+        switch type {
+        case .warmup:
+            return "W"
+        case .failure:
+            return "F"
+        case .normal:
+            return "\(normalSetOrdinal(at: index))"
+        }
+    }
+
+    private func normalSetOrdinal(at index: Int) -> Int {
+        var ordinal = 0
+        for position in exercise.sets.indices where position <= index {
+            if exercise.sets[position].type == .normal {
+                ordinal += 1
+            }
+        }
+        return max(ordinal, 1)
+    }
+
+    private func deleteSet(at index: Int) {
+        guard exercise.sets.indices.contains(index), exercise.sets.count > 1 else { return }
+        exercise.sets.remove(at: index)
+    }
 }
 
 struct RestPickerView: View {
@@ -231,21 +307,27 @@ struct RestPickerView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Picker("Rest Timer", selection: $restMinutes) {
-                    ForEach(restOptions, id: \.self) { minutes in
-                        Text(restLabel(for: minutes))
-                            .tag(minutes)
+            List {
+                ForEach(restOptions, id: \.self) { minutes in
+                    Button {
+                        restMinutes = minutes
+                        dismiss()
+                    } label: {
+                        HStack {
+                            Text(restLabel(for: minutes))
+                                .foregroundStyle(StyleKit.ink)
+                            Spacer()
+                            if restMinutes == minutes {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(StyleKit.accentBlue)
+                            }
+                        }
                     }
                 }
-                .pickerStyle(.inline)
             }
             .navigationTitle("Rest Timer")
             .scrollContentBackground(.hidden)
             .background(AppBackgroundLayer())
-            .onChange(of: restMinutes) { _, _ in
-                dismiss()
-            }
         }
     }
 

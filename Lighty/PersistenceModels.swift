@@ -62,12 +62,14 @@ final class WorkoutSetEntity {
     var weight: Double
     var reps: Int
     var orderIndex: Int
+    var typeRaw: String?
 
-    init(id: UUID, weight: Double, reps: Int, orderIndex: Int) {
+    init(id: UUID, weight: Double, reps: Int, orderIndex: Int, typeRaw: String? = nil) {
         self.id = id
         self.weight = weight
         self.reps = reps
         self.orderIndex = orderIndex
+        self.typeRaw = typeRaw
     }
 }
 

@@ -246,7 +246,8 @@ final class RoutineStore: ObservableObject {
                     id: set.id,
                     weight: set.weight,
                     reps: set.reps,
-                    orderIndex: setIndex
+                    orderIndex: setIndex,
+                    typeRaw: set.type.rawValue
                 )
             }
 
@@ -380,7 +381,8 @@ final class RoutineStore: ObservableObject {
                 WorkoutSet(
                     id: setEntity.id,
                     weight: setEntity.weight,
-                    reps: setEntity.reps
+                    reps: setEntity.reps,
+                    type: WorkoutSetType(rawValue: setEntity.typeRaw ?? "") ?? .normal
                 )
             }
 
